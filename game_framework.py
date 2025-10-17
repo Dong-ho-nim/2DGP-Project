@@ -37,3 +37,5 @@ class Fighter:
         pygame.draw.rect(screen, self.color, self.rect)
         # 체력바
         pygame.draw.rect(screen, (255, 0, 0), (self.rect.x, self.rect.y - 20, self.hp, 10))
+
+
