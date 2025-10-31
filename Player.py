@@ -14,6 +14,7 @@ class Byakuya:
         self._acc = 0.0
         self._apply_anim_props()
 
+    def update(self):
 
 
     def draw(self):
