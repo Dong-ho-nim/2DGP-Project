@@ -1,41 +1,25 @@
 from pico2d import *
+from Player import Byakuya
 
-class Fighter:
-    def __init__(self, x, y, color):
-        self.rect = pygame.Rect(x, y, 50, 100)  # 캐릭터 크기
-        self.color = color
-        self.hp = 100
-        self.speed = 5
-        self.attack_power = 10
-        self.is_attacking = False
+class Framework:
+    def __init__(self, width=800, height=600):
+        open_canvas(width, height)
+        self.running = True
+        self.player = Byakuya()
 
-    def handle_input(self, keys, left=True):
-        if left:
-            if keys[pygame.K_a]:
-                self.rect.x -= self.speed
-            if keys[pygame.K_d]:
-                self.rect.x += self.speed
-            if keys[pygame.K_w]:
-                self.rect.y -= self.speed
-            if keys[pygame.K_s]:
-                self.rect.y += self.speed
-            if keys[pygame.K_SPACE]:
-                self.is_attacking = True
-        else:
-            if keys[pygame.K_LEFT]:
-                self.rect.x -= self.speed
-            if keys[pygame.K_RIGHT]:
-                self.rect.x += self.speed
-            if keys[pygame.K_UP]:
-                self.rect.y -= self.speed
-            if keys[pygame.K_DOWN]:
-                self.rect.y += self.speed
-            if keys[pygame.K_RETURN]:
-                self.is_attacking = True
+    def run(self):
+        while self.running:
+            events = get_events()
+            for e in events:
+                if e.type == SDL_QUIT:
+                    self.running = False
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, self.color, self.rect)
-        # 체력바
-        pygame.draw.rect(screen, (255, 0, 0), (self.rect.x, self.rect.y - 20, self.hp, 10))
+            # 업데이트
+            self.player.update()
 
+            # 그리기
+            clear_canvas()
+            self.player.draw()
+            update_canvas()
 
+        close_canvas()
