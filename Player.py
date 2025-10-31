@@ -11,8 +11,6 @@ class Byakuya:
         }
         self.current_anim = "Idle"
         self.frame = 0
-        self._acc = 0.0
-        self._apply_anim_props()
 
     def update(self):
 
