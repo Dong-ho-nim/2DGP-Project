@@ -1,25 +1,24 @@
+# game_framework.py
 from pico2d import *
-from Player import Byakuya
 
-class Framework:
-    def __init__(self, width=800, height=600):
-        open_canvas(width, height)
-        self.running = True
-        self.player = Byakuya()
+running = True
+current_mode = None
 
-    def run(self):
-        while self.running:
-            events = get_events()
-            for e in events:
-                if e.type == SDL_QUIT:
-                    self.running = False
+def run(start_mode):
+    global current_mode, running
+    current_mode = start_mode
+    current_mode.enter()
 
-            # 업데이트
-            self.player.update()
+    while running:
+        events = get_events()
+        for e in events:
+            current_mode.handle_event(e)
 
-            # 그리기
-            clear_canvas()
-            self.player.draw()
-            update_canvas()
+        current_mode.update()
+        current_mode.draw()
 
-        close_canvas()
+    current_mode.exit()
+
+def quit():
+    global running
+    running = False
