@@ -16,3 +16,4 @@ class Byakuya:
 
 
     def draw(self):
+        self.image.draw(self.anim_defs)
