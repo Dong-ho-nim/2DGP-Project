@@ -13,3 +13,7 @@ class Byakuya:
         self.frame = 0
         self._acc = 0.0
         self._apply_anim_props()
+
+
+
+    def draw(self):
