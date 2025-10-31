@@ -13,7 +13,7 @@ class Byakuya:
         self.frame = 0
 
     def update(self):
-
+        pass
 
     def draw(self):
         self.image.draw(self.anim_defs)
