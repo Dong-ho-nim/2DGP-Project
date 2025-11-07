@@ -2,10 +2,12 @@ from pico2d import *
 from Player import Byakuya
 
 character = None
+background = None
 
 def enter():
-    global character
+    global character, background
     character = Byakuya()
+    background = load_image('background.png')  # 배경 이미지 불러오기
 
 def exit():
     pass
@@ -28,5 +30,6 @@ def update():
 
 def draw():
     clear_canvas()
-    character.draw()
+    background.draw(600, 350)   # 배경 먼저 그리기 (좌표는 캔버스 크기에 맞게 조정)
+    character.draw()            # 캐릭터 그리기
     update_canvas()
