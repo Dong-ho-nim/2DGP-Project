@@ -7,7 +7,7 @@ class Byakuya:
         self.y = y
         self.frame = 0
         self.state = "Idle"
-        self.image = load_image('byakuya.png')  # 투명 배경 PNG 준비
+        self.image = load_image('DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png')  # 투명 배경 PNG 준비
 
         # 애니메이션 정의 (row 값은 스프라이트 시트에 맞게 조정)
         self.anim_defs = {
