@@ -11,8 +11,8 @@ class Byakuya:
         self.wait_time = get_time()
         self.image = load_image('DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png')
         # 스프라이트 시트 파라미터(필요시 값만 바꿔서 튜닝)
-        self.frame_w = 71
-        self.frame_h = 106
+        self.frame_w = 66
+        self.frame_h = 108
         self.frames_per_row = 8
         # "시트의 윗줄" = 0, 그 아래줄 = 1, ...
         self.row_from_top = 2
