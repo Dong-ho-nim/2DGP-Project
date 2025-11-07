@@ -9,13 +9,13 @@ class Byakuya:
         self.frame = 0
         self.dir = 0
         self.wait_time = get_time()
-        self.image = load_image('DS _ DSi - Bleach_ The 3rd Phantom - Battle Screen - Byakuya Kuchiki.png')
+        self.image = load_image('DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png')
         # 스프라이트 시트 파라미터(필요시 값만 바꿔서 튜닝)
         self.frame_w = 71
         self.frame_h = 106
         self.frames_per_row = 8
         # "시트의 윗줄" = 0, 그 아래줄 = 1, ...
-        self.row_from_top = 0
+        self.row_from_top = 2
         self.top_margin = 0  # 시트 최상단 여백이 있으면 픽셀값으로 보정
         # 균일 배치 보정값
         self.left_margin = 0
