@@ -1,4 +1,3 @@
-# game_framework.py
 from pico2d import *
 
 running = True
@@ -6,17 +5,14 @@ current_mode = None
 frame_time = 0.0
 
 def run(start_mode):
-    global current_mode, running, frame_time
+    global current_mode, running
     current_mode = start_mode
     current_mode.enter()
 
-    prev_time = get_time()
-    frame_time = 0.0
-
+    global frame_time
+    running = True
     while running:
-        current_time = get_time()
-        frame_time = current_time - prev_time
-        prev_time = current_time
+        frame_time = get_frame_time()
 
         events = get_events()
         for e in events:
@@ -24,9 +20,6 @@ def run(start_mode):
 
         current_mode.update()
         current_mode.draw()
-
-        # 짧은 딜레이로 CPU 사용량을 줄임
-        delay(0.01)
 
     current_mode.exit()
 
