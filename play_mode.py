@@ -1,6 +1,6 @@
 from pico2d import *
 from Player import Byakuya
-from BackGround import BackGround, Sky
+from BackGround import BackGround
 
 character = None
 background = None
