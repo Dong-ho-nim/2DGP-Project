@@ -1,14 +1,22 @@
 from pico2d import *
 from Player import Byakuya
+from BackGround import BackGround, Sky
 
 character = None
+background = None
+sky = None
 
 def enter():
-    global character
+    global character, background, sky
+    background = BackGround()
+    sky = Sky()
     character = Byakuya()
 
 def exit():
-    pass
+    global character, background, sky
+    character = None
+    background = None
+    sky = None
 
 def handle_event(event):
     if event.type == SDL_QUIT:
@@ -16,9 +24,19 @@ def handle_event(event):
         game_framework.quit()
 
 def update():
-    character.update()
+    if background:
+        background.update()
+    if sky:
+        sky.update()
+    if character:
+        character.update()
 
 def draw():
     clear_canvas()
-    character.draw()
+    if background:
+        background.draw()
+    if sky:
+        sky.draw()
+    if character:
+        character.draw()
     update_canvas()
