@@ -1,5 +1,5 @@
 from pico2d import *
-from player import Byakuya
+from Player import Byakuya
 
 character = None
 
