@@ -1,35 +1,32 @@
 from pico2d import *
-from Player import Byakuya
-from BackGround import BackGround
+from player import Byakuya
 
 character = None
-background = None
 
 def enter():
-    global character, background
-    background = BackGround()
+    global character
     character = Byakuya()
 
 def exit():
-    global character, background
-    character = None
-    background = None
+    pass
 
 def handle_event(event):
     if event.type == SDL_QUIT:
         import game_framework
         game_framework.quit()
+    elif event.type == SDL_KEYDOWN:
+        if event.key == SDLK_RIGHT:
+            character.set_state("WalkRight")
+        elif event.key == SDLK_LEFT:
+            character.set_state("WalkLeft")
+    elif event.type == SDL_KEYUP:
+        if event.key in (SDLK_RIGHT, SDLK_LEFT):
+            character.set_state("Idle")
 
 def update():
-    if background:
-        background.update()
-    if character:
-        character.update()
+    character.update()
 
 def draw():
     clear_canvas()
-    if background:
-        background.draw()
-    if character:
-        character.draw()
+    character.draw()
     update_canvas()
