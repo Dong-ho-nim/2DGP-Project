@@ -24,6 +24,9 @@ def handle_event(event):
     elif event.type == SDL_KEYUP:
         if event.key in (SDLK_RIGHT, SDLK_LEFT):
             character.set_state("Idle")
+    if event.type == SDL_KEYDOWN:
+        if event.key == SDLK_l:
+            character.set_state("Teleport")
 
 def update():
     character.update()

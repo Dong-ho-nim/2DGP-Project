@@ -2,7 +2,7 @@ from pico2d import load_image
 import game_framework
 
 class Byakuya:
-    def __init__(self, x=800, y=300):
+    def __init__(self, x=800, y=200):
         self.x = x
         self.y = y
         self.frame = 0
@@ -13,8 +13,9 @@ class Byakuya:
         # 맨 위 줄 = row 0, 그 아래 줄 = row 1 ...
         self.anim_defs = {
             "Idle": {"row": 2, "w": 66, "h": 108, "cols": 8, "fps": 8},   # 위에서 두 번째 줄
-            "WalkRight": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 8},
-            "WalkLeft": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 8},  # 같은 줄 사용, draw에서 반전
+            "WalkRight": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 5},
+            "WalkLeft": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 5},  # 같은 줄 사용, draw에서 반전
+            "Teleport": {"row": 7, "w": 71, "h": 108, "cols": 8, "fps": 12},  # 맨 위 줄
         }
 
         self._anim_acc = 0.0
@@ -50,8 +51,12 @@ class Byakuya:
 
         if self.state == "WalkLeft":
             # 좌우 반전
-            self.image.clip_composite_draw(frame_x, bottom, anim["w"], anim["h"],
+            self.image.clip_composite_draw(int(frame_x) % 4, bottom, anim["w"], anim["h"],
                                            0, 'h', self.x, self.y, anim["w"], anim["h"])
         else:
             # Idle, WalkRight
-            self.image.clip_draw(frame_x, bottom, anim["w"], anim["h"], self.x, self.y)
+            self.image.clip_draw(int(frame_x) % 4, bottom, anim["w"], anim["h"], self.x, self.y)
+
+        if self.state == "TeleportLeft":
+            self.image.clip_composite_draw(int(frame_x) % 3, bottom, anim["w"], anim["h"],
+                                           0, 'h', self.x, self.y, anim["w"], anim["h"])
