@@ -15,7 +15,7 @@ class Byakuya:
             "Idle": {"row": 2, "w": 66, "h": 108, "cols": 8, "fps": 8},   # 위에서 두 번째 줄
             "WalkRight": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 5},
             "WalkLeft": {"row": 5, "w": 66, "h": 108, "cols": 8, "fps": 5},  # 같은 줄 사용, draw에서 반전
-            "Teleport": {"row": 7, "w": 71, "h": 108, "cols": 8, "fps": 12},  # 맨 위 줄
+            "Teleport": {"row": 7, "w": 106, "h": 108, "cols": 8, "fps": 12},  # 맨 위 줄
         }
 
         self._anim_acc = 0.0
