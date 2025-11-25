@@ -1,38 +1,34 @@
+# play_mode.py
 from pico2d import *
-from Player import Byakuya
+import game_framework
+import game_world
+from Pain import Pain
+from BackGround import BackGround
 
-character = None
-background = None
+p1 = p2 = None
 
 def enter():
-    global character, background
-    character = Byakuya()
-    background = load_image('background.png')  # 배경 이미지 불러오기
+    global p1, p2
+    game_world.clear()
+    game_world.add_object(BackGround(), 0)
+    p1 = Pain(player=1, x=300)
+    p2 = Pain(player=2, x=900)
+    game_world.add_object(p1, 1)
+    game_world.add_object(p2, 1)
+    game_world.add_collision_pair('p1:p2', p1, p2)
 
-def exit():
-    pass
-
-def handle_event(event):
+def handle_events(event):
     if event.type == SDL_QUIT:
-        import game_framework
         game_framework.quit()
-    elif event.type == SDL_KEYDOWN:
-        if event.key == SDLK_RIGHT:
-            character.set_state("WalkRight")
-        elif event.key == SDLK_LEFT:
-            character.set_state("WalkLeft")
-    elif event.type == SDL_KEYUP:
-        if event.key in (SDLK_RIGHT, SDLK_LEFT):
-            character.set_state("Idle")
-    if event.type == SDL_KEYDOWN:
-        if event.key == SDLK_l:
-            character.set_state("Teleport")
+    elif event.type in (SDL_KEYDOWN, SDL_KEYUP):
+        p1.handle_event(event)
+        p2.handle_event(event)
 
 def update():
-    character.update()
+    game_world.update()
+    game_world.handle_collisions()
 
 def draw():
     clear_canvas()
-    background.draw(600, 350)   # 배경 먼저 그리기
-    character.draw()            # 캐릭터 그리기
+    game_world.render()
     update_canvas()

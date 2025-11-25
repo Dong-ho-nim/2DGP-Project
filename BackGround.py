@@ -1,25 +1,9 @@
-from pico2d import *
+# BackGround.py
+from pico2d import load_image
 
 class BackGround:
     def __init__(self):
-        self.image = load_image('BackGround.png')
-
-    def update(self):
-        pass
-
+        self.image = load_image('background.png')   # 프로젝트 루트에 배경 넣기
+    def update(self): pass
     def draw(self):
-        # 캔버스가 1280x720이므로 중앙은 (640, 360)
-        print('BackGround.draw')
-        self.image.draw(640, 360)
-
-# class Sky:
-#     def __init__(self):
-#         self.image = load_image('Sky.png')
-#
-#     def update(self):
-#         pass
-#
-#     def draw(self):
-#         print('Sky.draw')
-#         self.image.draw(640, 360)
-#
+        self.image.draw(600, 350)   # 1200×700 캔버스 중앙
