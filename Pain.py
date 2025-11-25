@@ -1,3 +1,4 @@
+# python
 from pico2d import *
 import game_framework
 import os
@@ -16,27 +17,19 @@ def load_resource(path):
 # 이벤트 체크
 time_out = lambda e: e[0] == 'TIMEOUT'
 
-# === 키 체크 람다 함수들 (완전히 수정 완료!) ===
-# 1P 키
-p1_left_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_a
-p1_right_down    = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_d
-p1_down_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_s
-p1_jump_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_k        # K = 점프
-p1_weak_punch    = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_j        # J = 약펀치
-p1_kick          = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_l        # L = 킥
-p1_strong_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and \
-                            e[1].key==SDLK_j and keys[SDL_SCANCODE_S]                        # S + J = 강펀치
+# 1P
+p1_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_a
+p1_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_d
+p1_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_k
+p1_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_j
+p1_kick        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_l
 
-# 2P 키
-p2_left_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT, SDLK_KP_4]
-p2_right_down    = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT, SDLK_KP_6]
-p2_down_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_DOWN, SDLK_KP_5]
-p2_jump_down     = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_KP_2                    # KP_2 = 점프
-p2_weak_punch    = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]       # KP_1 = 약펀치
-p2_kick          = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]       # KP_3 = 킥
-p2_strong_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and \
-                            e[1].key in [SDLK_KP_1, SDLK_KP_7] and \
-                            (keys[SDL_SCANCODE_DOWN] or keys[SDL_SCANCODE_KP_5])                   # ↓ + KP_1 = 강펀치
+# 2P
+p2_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT, SDLK_KP_4]
+p2_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT, SDLK_KP_6]
+p2_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_KP_2
+p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]
+p2_kick        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
 
 # === 상태 클래스들 ===
 class Idle:
@@ -125,12 +118,13 @@ class Kick:
 class PowerAttack:  # 강펀치
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e):
-        self.p.load_image('Pain_PowerAttack.png')  # 이 파일 준비하세요!
+        self.p.load_image('Pain_PowerAttack.png')
         self.frame = 0
     def exit(self, e): pass
     def do(self):
         self.frame += 8 * game_framework.frame_time * 2.0
         if self.frame >= 9.9:
+            self.frame = 0
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
     def draw(self):
         sx = int(self.frame) * 116
@@ -157,6 +151,7 @@ class ShinraTensei:
 
 
 # === 메인 클래스 Pain ===
+# python
 class Pain:
     def __init__(self, player=1, x=600):
         self.player = player
@@ -166,35 +161,34 @@ class Pain:
         self.vy = 0
         self.image = None
         self.input_buffer = []
+        # 눌린 키를 추적하는 집합 (이게 핵심)
+        self.pressed = set()
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
         self.JUMP = Jump(self)
         self.PUNCH = Punch(self)
         self.KICK = Kick(self)
-        self.POWERATTACK = PowerAttack(self)   # ← 이름 통일
+        self.POWERATTACK = PowerAttack(self)
         self.SHINRA = ShinraTensei(self)
-
-        def shinra_cmd(e):
-            seq = ''.join(self.input_buffer[-3:])
-            return (self.player==1 and p1_weak_punch(e) and seq in ['236', '263']) or \
-                   (self.player==2 and p2_weak_punch(e) and seq in ['236', '263'])
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
-                lambda e: (self.player==1 and (p1_left_down(e) or p1_right_down(e))) or
-                          (self.player==2 and (p2_left_down(e) or p2_right_down(e))): self.RUN,
-                lambda e: (self.player==1 and p1_jump_down(e)) or (self.player==2 and p2_jump_down(e)): self.JUMP,
-                lambda e: (self.player==1 and p1_weak_punch(e)) or (self.player==2 and p2_weak_punch(e)): self.PUNCH,
-                lambda e: (self.player==1 and p1_kick(e)) or (self.player==2 and p2_kick(e)): self.KICK,
-                lambda e: (self.player==1 and p1_strong_punch(e)) or (self.player==2 and p2_strong_punch(e)): self.POWERATTACK,
-                shinra_cmd: self.SHINRA,
+                lambda e: (self.player == 1 and (p1_left_down(e) or p1_right_down(e))) or
+                          (self.player == 2 and (p2_left_down(e) or p2_right_down(e))): self.RUN,
+                lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
+                lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
+                lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
+                lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
+                lambda e: e[0] == 'SHINRA': self.SHINRA,
             },
             self.RUN: {
-                lambda e: e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
-                lambda e: (self.player==1 and p1_jump_down(e)) or (self.player==2 and p2_jump_down(e)): self.JUMP,
-                lambda e: (self.player==1 and p1_weak_punch(e)) or (self.player==2 and p2_weak_punch(e)): self.PUNCH,
-                lambda e: (self.player==1 and p1_kick(e)) or (self.player==2 and p2_kick(e)): self.KICK,
+                lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
+                lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
+                lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
+                lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
+                lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
+                lambda e: e[0] == 'SHINRA': self.SHINRA,
             },
             self.JUMP: {time_out: self.IDLE},
             self.PUNCH: {time_out: self.IDLE},
@@ -207,9 +201,17 @@ class Pain:
         self.image = load_resource(name)
 
     def update(self):
-        global keys
-        keys = SDL_GetKeyboardState(None)  # ← 매 프레임 갱신 필수!
+        # 실시간 키 상태 대신 handle_event에서 관리하는 self.pressed 사용
+        if self.state_machine.cur_state in [self.IDLE, self.RUN]:
+            if self.player == 1:
+                if (SDLK_s in self.pressed) and (SDLK_j in self.pressed):
+                    self.state_machine.handle_state_event(('PowerAttack', None))
+            else:
+                if ((SDLK_DOWN in self.pressed) or (SDLK_KP_5 in self.pressed)) and \
+                   ((SDLK_KP_1 in self.pressed) or (SDLK_KP_7 in self.pressed)):
+                    self.state_machine.handle_state_event(('PowerAttack', None))
 
+        # 방향 처리 유지
         if self.state_machine.cur_state == self.RUN:
             self.face_dir = self.dir
         elif self.state_machine.cur_state == self.IDLE:
@@ -219,30 +221,69 @@ class Pain:
                     if obj != self and isinstance(obj, Pain):
                         self.face_dir = 1 if obj.x > self.x else -1
                         break
-                else: continue
+                else:
+                    continue
                 break
 
         self.state_machine.update()
 
     def handle_event(self, event):
+        # KEYDOWN/KEYUP로 self.pressed를 업데이트해서 동시입력을 안정적으로 감지
         if event.type == SDL_KEYDOWN:
+            self.pressed.add(event.key)
             key = event.key
+            # 신라천정 입력버퍼 기록
             if self.player == 1:
-                if key == SDLK_s: self.input_buffer.append('2')
-                elif key == SDLK_d and self.input_buffer[-1:] == ['2']: self.input_buffer.append('3')
-                elif key == SDLK_a and self.input_buffer[-1:] == ['2']: self.input_buffer.append('1')
-                elif key == SDLK_d: self.input_buffer.append('6')
-                elif key == SDLK_a: self.input_buffer.append('4')
+                if key == SDLK_s:
+                    self.input_buffer.append('2')
+                elif key == SDLK_d:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('3')
+                    else:
+                        self.input_buffer.append('6')
+                elif key == SDLK_a:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('1')
+                    else:
+                        self.input_buffer.append('4')
+                elif key == SDLK_j:
+                    seq = ''.join(self.input_buffer[-3:])
+                    if seq in ['236', '263']:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('SHINRA', None))
+                        return
             else:
-                if key in [SDLK_DOWN, SDLK_KP_5]: self.input_buffer.append('2')
-                elif key in [SDLK_RIGHT, SDLK_KP_6] and self.input_buffer[-1:] == ['2']: self.input_buffer.append('3')
-                elif key in [SDLK_LEFT, SDLK_KP_4] and self.input_buffer[-1:] == ['2']: self.input_buffer.append('1')
-                elif key in [SDLK_RIGHT, SDLK_KP_6]: self.input_buffer.append('6')
-                elif key in [SDLK_LEFT, SDLK_KP_4]: self.input_buffer.append('4')
+                if key in [SDLK_DOWN, SDLK_KP_5]:
+                    self.input_buffer.append('2')
+                elif key in [SDLK_RIGHT, SDLK_KP_6]:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('3')
+                    else:
+                        self.input_buffer.append('6')
+                elif key in [SDLK_LEFT, SDLK_KP_4]:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('1')
+                    else:
+                        self.input_buffer.append('4')
+                elif key in [SDLK_KP_1, SDLK_KP_7]:
+                    seq = ''.join(self.input_buffer[-3:])
+                    if seq in ['236', '263']:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('SHINRA', None))
+                        return
+
             if len(self.input_buffer) > 12:
                 self.input_buffer = self.input_buffer[-12:]
 
-        self.state_machine.handle_state_event(('INPUT', event))
+            # 기존 INPUT 이벤트 전달
+            self.state_machine.handle_state_event(('INPUT', event))
+
+        elif event.type == SDL_KEYUP:
+            # 키 해제 시 제거
+            if event.key in self.pressed:
+                self.pressed.remove(event.key)
+            # 키업도 상태머신에 전달
+            self.state_machine.handle_state_event(('INPUT', event))
 
     def draw(self):
         self.state_machine.draw()
