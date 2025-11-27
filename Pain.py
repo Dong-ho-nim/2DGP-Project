@@ -149,6 +149,23 @@ class ShinraTensei:
         else:
             self.p.image.clip_composite_draw(sx, 0, 220, 220, 0, 'h', self.p.x, self.p.y + 100, 660, 660)
 
+class Skill:
+    def __init__(self, p): self.p = p; self.frame = 0
+    def enter(self, e):
+        self.p.load_image('Pain_Skill.png')
+        self.frame = 0
+    def exit(self, e): pass
+    def do(self):
+        self.frame += 10 * game_framework.frame_time * 1.5
+        if self.frame >= 9.9:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+    def draw(self):
+        sx = int(self.frame) * 150
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(sx, 0, 150, 120, self.p.x, self.p.y)
+        else:
+            self.p.image.clip_composite_draw(sx, 0, 150, 120, 0, 'h', self.p.x, self.p.y, 150, 120)
+
 
 # === 메인 클래스 Pain ===
 # python
@@ -171,6 +188,7 @@ class Pain:
         self.KICK = Kick(self)
         self.POWERATTACK = PowerAttack(self)
         self.SHINRA = ShinraTensei(self)
+        self.SKILL = Skill(self)
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -181,6 +199,7 @@ class Pain:
                 lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SHINRA': self.SHINRA,
+                lambda e: e[0] == 'SKILL': self.SKILL,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -189,12 +208,14 @@ class Pain:
                 lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SHINRA': self.SHINRA,
+                lambda e: e[0] == 'SKILL': self.SKILL,
             },
             self.JUMP: {time_out: self.IDLE},
             self.PUNCH: {time_out: self.IDLE},
             self.KICK: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
             self.SHINRA: {time_out: self.IDLE},
+            self.SKILL: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
@@ -203,10 +224,7 @@ class Pain:
     def update(self):
         # 실시간 키 상태 대신 handle_event에서 관리하는 self.pressed 사용
         if self.state_machine.cur_state in [self.IDLE, self.RUN]:
-            if self.player == 1:
-                if (SDLK_s in self.pressed) and (SDLK_j in self.pressed):
-                    self.state_machine.handle_state_event(('PowerAttack', None))
-            else:
+            if self.player == 2:
                 if ((SDLK_DOWN in self.pressed) or (SDLK_KP_5 in self.pressed)) and \
                    ((SDLK_KP_1 in self.pressed) or (SDLK_KP_7 in self.pressed)):
                     self.state_machine.handle_state_event(('PowerAttack', None))
@@ -234,7 +252,9 @@ class Pain:
             key = event.key
             # 신라천정 입력버퍼 기록
             if self.player == 1:
-                if key == SDLK_s:
+                if key == SDLK_w:
+                    self.input_buffer.append('w')
+                elif key == SDLK_s:
                     self.input_buffer.append('2')
                 elif key == SDLK_d:
                     if self.input_buffer and self.input_buffer[-1] == '2':
@@ -247,6 +267,18 @@ class Pain:
                     else:
                         self.input_buffer.append('4')
                 elif key == SDLK_j:
+                    # Skill: w -> j
+                    if self.input_buffer and self.input_buffer[-1] == 'w':
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('SKILL', None))
+                        return
+                        
+                    # PowerAttack: s -> j (input_buffer: '2')
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('PowerAttack', None))
+                        return
+
                     seq = ''.join(self.input_buffer[-3:])
                     if seq in ['236', '263']:
                         self.input_buffer.clear()
