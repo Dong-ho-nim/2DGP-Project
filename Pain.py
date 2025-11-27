@@ -22,14 +22,14 @@ p1_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key
 p1_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_d
 p1_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_k
 p1_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_j
-p1_kick        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_l
+p1_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_l
 
 # 2P
 p2_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT, SDLK_KP_4]
 p2_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT, SDLK_KP_6]
 p2_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_KP_2
 p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]
-p2_kick        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
+p2_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
 
 # === 상태 클래스들 ===
 class Idle:
@@ -100,20 +100,25 @@ class Punch:
         else:
             self.p.image.clip_composite_draw(sx, 0, 110, 80, 0, 'h', self.p.x - 30, self.p.y + 10, 110, 80)
 
-class Kick:
+class Dash:
     def __init__(self, p): self.p = p; self.frame = 0
-    def enter(self, e): self.p.load_image('Pain_Kick.png'); self.frame = 0
+    def enter(self, e):
+        self.p.load_image('Pain_Dash.png')
+        self.frame = 0
     def exit(self, e): pass
     def do(self):
-        self.frame += 10 * game_framework.frame_time * 1.8
-        if self.frame >= 9.9:
+        self.frame += 2 * game_framework.frame_time * 5  # Assuming 2 frames for dash animation
+        self.p.x += self.p.face_dir * 800 * game_framework.frame_time
+        self.p.x = max(100, min(1100, self.p.x))
+        if self.frame >= 1.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
     def draw(self):
-        sx = int(self.frame) * 150
+        sx = int(self.frame) * 70 # Assuming frame width is 88px for dash
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 150, 120, self.p.x + 40, self.p.y - 20)
+            self.p.image.clip_draw(sx, 0, 70, 85, self.p.x, self.p.y)
         else:
-            self.p.image.clip_composite_draw(sx, 0, 150, 120, 0, 'h', self.p.x - 40, self.p.y - 20, 150, 120)
+            self.p.image.clip_composite_draw(sx, 0, 70, 85, 0, 'h', self.p.x, self.p.y, 70, 85)
+
 
 class PowerAttack:  # 강펀치
     def __init__(self, p): self.p = p; self.frame = 0
@@ -160,11 +165,11 @@ class Skill:
         if self.frame >= 9.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
     def draw(self):
-        sx = int(self.frame) * 150
+        sx = int(self.frame) * 100
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 150, 120, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 100, 85, self.p.x, self.p.y)
         else:
-            self.p.image.clip_composite_draw(sx, 0, 150, 120, 0, 'h', self.p.x, self.p.y, 150, 120)
+            self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y, 100, 85)
 
 
 # === 메인 클래스 Pain ===
@@ -185,7 +190,7 @@ class Pain:
         self.RUN = Run(self)
         self.JUMP = Jump(self)
         self.PUNCH = Punch(self)
-        self.KICK = Kick(self)
+        self.DASH = Dash(self)
         self.POWERATTACK = PowerAttack(self)
         self.SHINRA = ShinraTensei(self)
         self.SKILL = Skill(self)
@@ -196,7 +201,7 @@ class Pain:
                           (self.player == 2 and (p2_left_down(e) or p2_right_down(e))): self.RUN,
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
-                lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
+                lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SHINRA': self.SHINRA,
                 lambda e: e[0] == 'SKILL': self.SKILL,
@@ -205,14 +210,14 @@ class Pain:
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
-                lambda e: (self.player == 1 and p1_kick(e)) or (self.player == 2 and p2_kick(e)): self.KICK,
+                lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SHINRA': self.SHINRA,
                 lambda e: e[0] == 'SKILL': self.SKILL,
             },
             self.JUMP: {time_out: self.IDLE},
             self.PUNCH: {time_out: self.IDLE},
-            self.KICK: {time_out: self.IDLE},
+            self.DASH: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
             self.SHINRA: {time_out: self.IDLE},
             self.SKILL: {time_out: self.IDLE},
@@ -232,16 +237,6 @@ class Pain:
         # 방향 처리 유지
         if self.state_machine.cur_state == self.RUN:
             self.face_dir = self.dir
-        elif self.state_machine.cur_state == self.IDLE:
-            from game_world import objects
-            for layer in objects:
-                for obj in layer:
-                    if obj != self and isinstance(obj, Pain):
-                        self.face_dir = 1 if obj.x > self.x else -1
-                        break
-                else:
-                    continue
-                break
 
         self.state_machine.update()
 
