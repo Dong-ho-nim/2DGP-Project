@@ -130,10 +130,10 @@ class Bankai:
 
 # ==================== 메인 클래스 ====================
 class Byakuya:
-    def __init__(self):
-        self.x, self.y = 600, 250
+    def __init__(self, x=900, player_num=2):
+        self.x, self.y = x, 250
         self.frame = 0.0
-        self.face_dir = 1
+        self.face_dir = -1 if player_num == 2 else 1
         self.vy = 0
         self.image = load_image('DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png')  # 스프라이터스 리소스 파일
 

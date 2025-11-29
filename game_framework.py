@@ -9,12 +9,12 @@ prev_time = 0.0
 
 
 # game_framework.py (마지막 부분 수정)
-def change_mode(mode):
+def change_mode(mode, *args):
     global current_mode
     if current_mode:
         current_mode.exit()
     current_mode = mode
-    current_mode.enter()
+    current_mode.enter(*args)
 
 def run(start_mode):
     global current_mode, running, frame_time, prev_time

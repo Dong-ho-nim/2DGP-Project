@@ -3,6 +3,7 @@ import math
 
 import game_framework
 import play_mode
+import character_select_mode
 
 # Sprite Animation Constants
 NUM_CIRCLE_FRAMES = 9
@@ -61,12 +62,11 @@ def exit():
 def handle_events(event):
     if event.type == SDL_QUIT:
         game_framework.quit()
-    elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-        game_framework.quit()
-    elif event.type == SDL_MOUSEBUTTONDOWN and event.button == SDL_BUTTON_LEFT:
-        # vs Human 버튼 클릭 확인 (1200x700 캔버스에 맞게 좌표 수정)
-        if 600 - 150 <= event.x <= 600 + 150 and 400 - 50 <= 700 - 1 - event.y <= 400 + 50:
-            game_framework.change_mode(play_mode)
+    elif event.type == SDL_KEYDOWN:
+        if event.key == SDLK_ESCAPE:
+            game_framework.quit()
+        elif event.key == SDLK_j:
+            game_framework.change_mode(character_select_mode)
 
 
 def update():
