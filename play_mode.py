@@ -14,9 +14,11 @@ def enter():
     game_world.add_object(BackGround(), 0)
 
     # p1 is Byakuya, p2 is Pain
-    p1 = Byakuya(player=1, x=900)
-    p2 = Pain(player=2, x=300)
+    p1 = Byakuya(player=1, x=900, y=50)
+    p2 = Pain(player=2, x=300, y=50)
 
+    p1.set_opponent(p2)
+    p2.set_opponent(p1)
 
     game_world.add_object(p1, 1)
     game_world.add_object(p2, 1)

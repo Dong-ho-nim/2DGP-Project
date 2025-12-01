@@ -40,9 +40,9 @@ class Idle:
     def draw(self):
         sx = int(self.frame) * 88
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 88, 100, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 88, 100, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 88, 100, 0, 'h', self.p.x, self.p.y, 88, 100)
+            self.p.image.clip_composite_draw(sx, 0, 88, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 88, 100)
 
 class Run:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -62,9 +62,9 @@ class Run:
     def draw(self):
         sx = int(self.frame) * 86
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 86, 75, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 86, 75, self.p.x, self.p.y + (75 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 86, 75, 0, 'h', self.p.x, self.p.y, 86, 75)
+            self.p.image.clip_composite_draw(sx, 0, 86, 75, 0, 'h', self.p.x, self.p.y + (75 / 2), 86, 75)
 
 class Jump:
     def __init__(self, p): self.p = p
@@ -72,18 +72,18 @@ class Jump:
         self.p.load_image('Pain_Jump.png')
         self.p.vy = 800
         if self.p.dir != 0: self.p.face_dir = self.p.dir
-    def exit(self, e): self.p.y = 250
+    def exit(self, e): self.p.y = self.p.jump_start_y # 지면 y좌표로 복귀
     def do(self):
         self.p.y += self.p.vy * game_framework.frame_time
         self.p.vy -= 2500 * game_framework.frame_time
-        if self.p.y <= 250:
-            self.p.y = 250
+        if self.p.y <= self.p.jump_start_y: # 지면 y좌표 체크
+            self.p.y = self.p.jump_start_y
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
     def draw(self):
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(0, 0, 60, 65, self.p.x, self.p.y)
+            self.p.image.clip_draw(0, 0, 60, 65, self.p.x, self.p.y + (65 / 2))
         else:
-            self.p.image.clip_composite_draw(0, 0, 60, 65, 0, 'h', self.p.x, self.p.y, 60, 65)
+            self.p.image.clip_composite_draw(0, 0, 60, 65, 0, 'h', self.p.x, self.p.y + (65 / 2), 60, 65)
 
 class Punch:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -96,9 +96,9 @@ class Punch:
     def draw(self):
         sx = int(self.frame) * 93
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 93, 80, self.p.x + 30, self.p.y + 10)
+            self.p.image.clip_draw(sx, 0, 93, 80, self.p.x + 30, self.p.y + (80 / 2) + 10) # y 보정 적용
         else:
-            self.p.image.clip_composite_draw(sx, 0, 110, 80, 0, 'h', self.p.x - 30, self.p.y + 10, 110, 80)
+            self.p.image.clip_composite_draw(sx, 0, 110, 80, 0, 'h', self.p.x - 30, self.p.y + (80 / 2) + 10, 110, 80) # y 보정 적용
 
 class Dash:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -115,9 +115,9 @@ class Dash:
     def draw(self):
         sx = int(self.frame) * 70 # Assuming frame width is 88px for dash
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 70, 85, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 70, 85, self.p.x, self.p.y + (85 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 70, 85, 0, 'h', self.p.x, self.p.y, 70, 85)
+            self.p.image.clip_composite_draw(sx, 0, 70, 85, 0, 'h', self.p.x, self.p.y + (85 / 2), 70, 85)
 
 
 class PowerAttack:  # 강펀치
@@ -135,9 +135,9 @@ class PowerAttack:  # 강펀치
         sx = int(self.frame) * 116
         offset_x = 70 if self.p.face_dir == 1 else -70
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 116, 80, self.p.x + offset_x, self.p.y + 10)
+            self.p.image.clip_draw(sx, 0, 116, 80, self.p.x + offset_x, self.p.y + (80 / 2) + 10)
         else:
-            self.p.image.clip_composite_draw(sx, 0, 116, 80, 0, 'h', self.p.x + offset_x, self.p.y + 10, 116, 80)
+            self.p.image.clip_composite_draw(sx, 0, 116, 80, 0, 'h', self.p.x + offset_x, self.p.y + (80 / 2) + 10, 116, 80)
 
 class ShinraTensei:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -150,9 +150,9 @@ class ShinraTensei:
     def draw(self):
         sx = int(self.frame) * 220
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 220, 220, self.p.x, self.p.y + 100, 660, 660)
+            self.p.image.clip_draw(sx, 0, 220, 220, self.p.x, self.p.y + (220 / 2) + 100, 660, 660) # y 보정 적용
         else:
-            self.p.image.clip_composite_draw(sx, 0, 220, 220, 0, 'h', self.p.x, self.p.y + 100, 660, 660)
+            self.p.image.clip_composite_draw(sx, 0, 220, 220, 0, 'h', self.p.x, self.p.y + (220 / 2) + 100, 660, 660) # y 보정 적용
 
 class Skill:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -167,17 +167,17 @@ class Skill:
     def draw(self):
         sx = int(self.frame) * 100
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 100, 85, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 100, 85, self.p.x, self.p.y + (85 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y, 100, 85)
+            self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y + (85 / 2), 100, 85)
 
 
 # === 메인 클래스 Pain ===
 # python
 class Pain:
-    def __init__(self, player=1, x=600):
+    def __init__(self, player=1, x=600, y=250):
         self.player = player
-        self.x, self.y = x, 250
+        self.x, self.y = x, y
         self.face_dir = 1 if player == 1 else -1
         self.dir = 0
         self.vy = 0
@@ -185,6 +185,7 @@ class Pain:
         self.input_buffer = []
         # 눌린 키를 추적하는 집합 (이게 핵심)
         self.pressed = set()
+        self.opponent = None # 상대 객체 초기화
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
@@ -318,3 +319,6 @@ class Pain:
 
     def get_bb(self):
         return self.x-60, self.y-100, self.x+60, self.y+20
+
+    def set_opponent(self, opponent): # 상대 객체를 설정하는 메서드 추가
+        self.opponent = opponent
