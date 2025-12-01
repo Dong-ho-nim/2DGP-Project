@@ -36,13 +36,13 @@ class Idle:
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e): self.p.load_image('Pain_Idle.png'); self.frame = 0
     def exit(self, e): pass
-    def do(self): self.frame = (self.frame + 5 * game_framework.frame_time * 8) % 5
+    def do(self): self.frame = (self.frame + 5 * game_framework.frame_time * 1) % 5
     def draw(self):
-        sx = int(self.frame) * 90
+        sx = int(self.frame) * 88
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 90, 95, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 88, 100, self.p.x, self.p.y)
         else:
-            self.p.image.clip_composite_draw(sx, 0, 90, 95, 0, 'h', self.p.x, self.p.y, 90, 95)
+            self.p.image.clip_composite_draw(sx, 0, 88, 100, 0, 'h', self.p.x, self.p.y, 88, 100)
 
 class Run:
     def __init__(self, p): self.p = p; self.frame = 0
