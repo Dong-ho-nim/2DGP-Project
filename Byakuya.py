@@ -155,7 +155,7 @@ class PowerAttack:
     def enter(self, e):
         self.p.load_image('Byakuya_PowerAttack.png')
         self.frame = 0
-        self.effect = Effect(self.p.x, self.p.y, 'Byakuya_PowerAttack_Effect.png', 4, 135, 100)
+        self.effect = Effect(self.p.x, self.p.y, 'Byakuya_PowerAttack_Effect.png', 5, 165, 100)
 
     def exit(self, e):
         self.effect = None
@@ -168,17 +168,48 @@ class PowerAttack:
     def draw(self):
         char_frame_index = int(self.frame)
 
-        sx = char_frame_index * 144
+        sx = char_frame_index * 165
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 144, 100, self.p.x, self.p.y)
+            self.p.image.clip_draw(sx, 0, 165, 100, self.p.x, self.p.y)
         else:
-            self.p.image.clip_composite_draw(sx, 0, 144, 100, 0, 'h', self.p.x, self.p.y, 144, 100)
+            self.p.image.clip_composite_draw(sx, 0, 165, 100, 0, 'h', self.p.x, self.p.y, 165, 100)
 
         if self.effect and 1 <= char_frame_index <= 4:
             effect_display_index = char_frame_index - 1
             self.effect.x, self.effect.y = self.p.x, self.p.y
             self.effect.frame = effect_display_index
             self.effect.draw(self.p.face_dir)
+
+class Jump:
+    def __init__(self, p): self.p = p
+    def enter(self, e):
+        self.p.load_image('Byakuya_Jump.png')
+        self.p.y_velocity = self.p.jump_speed  # 점프 시작 시 y 속도 설정
+        self.p.jump_start_y = self.p.y # 점프 시작 높이 기록
+
+    def exit(self, e):
+        self.p.y_velocity = 0
+        self.p.y = self.p.jump_start_y # 지면으로 y 위치 고정
+        # Removed redundant state_machine.handle_state_event(('TIMEOUT', None)) as it's handled in do method
+
+    def do(self):
+        # 중력 적용
+        self.p.y_velocity -= self.p.gravity * game_framework.frame_time
+        self.p.y += self.p.y_velocity * game_framework.frame_time
+
+        # 착지 확인
+        if self.p.y <= self.p.jump_start_y:
+            self.p.y = self.p.jump_start_y
+            self.p.state_machine.handle_state_event(('TIMEOUT', None)) # 점프 종료
+
+    def draw(self):
+        # Byakuya_Jump.png is a single image, not a sprite sheet.
+        # Assuming dimensions 66x100 based on previous context.
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(0, 0, 61, 95, self.p.x, self.p.y)
+        else:
+            self.p.image.clip_composite_draw(0, 0, 61, 95, 0, 'h', self.p.x, self.p.y, 61, 95)
+
 
 # === 메인 클래스 Byakuya ===
 class Byakuya:
@@ -191,13 +222,18 @@ class Byakuya:
         self.pressed = set()
         self.input_buffer = []
 
+        self.jump_speed = 700 # 점프 초기 속도
+        self.gravity = 1500 # 중력 가속도
+        self.y_velocity = 0 # y축 속도
+        self.jump_start_y = self.y # 점프 시작 높이 (지면 높이)
+
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
         self.DASH = Dash(self)
         self.ATTACK = Attack(self)
         self.POWERATTACK = PowerAttack(self)
-        # TODO: Add other states like Jump
+        self.JUMP = Jump(self)
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -205,17 +241,20 @@ class Byakuya:
                           (self.player == 2 and (p2_left_down(e) or p2_right_down(e))): self.RUN,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.ATTACK,
+                lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.ATTACK,
+                lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
             },
             self.DASH: {time_out: self.IDLE},
             self.ATTACK: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
+            self.JUMP: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
