@@ -145,6 +145,41 @@ class Attack:
             self.effect.frame = effect_display_index
             self.effect.draw(self.p.face_dir)
 
+
+class PowerAttack:
+    def __init__(self, p):
+        self.p = p
+        self.frame = 0
+        self.effect = None
+
+    def enter(self, e):
+        self.p.load_image('Byakuya_PowerAttack.png')
+        self.frame = 0
+        self.effect = Effect(self.p.x, self.p.y, 'Byakuya_PowerAttack_Effect.png', 4, 135, 100)
+
+    def exit(self, e):
+        self.effect = None
+
+    def do(self):
+        self.frame += 5 * game_framework.frame_time * 1.5
+        if self.frame >= 4.9:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+    def draw(self):
+        char_frame_index = int(self.frame)
+
+        sx = char_frame_index * 144
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(sx, 0, 144, 100, self.p.x, self.p.y)
+        else:
+            self.p.image.clip_composite_draw(sx, 0, 144, 100, 0, 'h', self.p.x, self.p.y, 144, 100)
+
+        if self.effect and 1 <= char_frame_index <= 4:
+            effect_display_index = char_frame_index - 1
+            self.effect.x, self.effect.y = self.p.x, self.p.y
+            self.effect.frame = effect_display_index
+            self.effect.draw(self.p.face_dir)
+
 # === 메인 클래스 Byakuya ===
 class Byakuya:
     def __init__(self, player=1, x=200):
@@ -154,11 +189,14 @@ class Byakuya:
         self.dir = 0
         self.image = None
         self.pressed = set()
+        self.input_buffer = []
+
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
         self.DASH = Dash(self)
         self.ATTACK = Attack(self)
+        self.POWERATTACK = PowerAttack(self)
         # TODO: Add other states like Jump
 
         self.state_machine = StateMachine(self.IDLE, {
@@ -167,27 +205,53 @@ class Byakuya:
                           (self.player == 2 and (p2_left_down(e) or p2_right_down(e))): self.RUN,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.ATTACK,
+                lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.ATTACK,
+                lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
             },
             self.DASH: {time_out: self.IDLE},
             self.ATTACK: {time_out: self.IDLE},
+            self.POWERATTACK: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
         self.image = load_resource(name)
 
     def update(self):
+        if self.state_machine.cur_state in [self.IDLE, self.RUN]:
+            if self.player == 2:
+                if ((SDLK_DOWN in self.pressed) or (SDLK_KP_5 in self.pressed)) and \
+                   ((SDLK_KP_1 in self.pressed) or (SDLK_KP_7 in self.pressed)):
+                    self.state_machine.handle_state_event(('PowerAttack', None))
         self.state_machine.update()
 
     def handle_event(self, event):
-        if event.type in [SDL_KEYDOWN, SDL_KEYUP]:
-            if event.type == SDL_KEYDOWN:
-                self.pressed.add(event.key)
-            elif event.key in self.pressed:
+        if event.type == SDL_KEYDOWN:
+            self.pressed.add(event.key)
+            key = event.key
+            if self.player == 1:
+                if key == SDLK_s:
+                    self.input_buffer.append('2')
+                elif key == SDLK_j:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('PowerAttack', None))
+                        return
+            else: # Player 2
+                if key in [SDLK_DOWN, SDLK_KP_5]:
+                    self.input_buffer.append('2')
+
+            if len(self.input_buffer) > 4:
+                self.input_buffer = self.input_buffer[-4:]
+
+            self.state_machine.handle_state_event(('INPUT', event))
+
+        elif event.type == SDL_KEYUP:
+            if event.key in self.pressed:
                 self.pressed.remove(event.key)
             self.state_machine.handle_state_event(('INPUT', event))
 
