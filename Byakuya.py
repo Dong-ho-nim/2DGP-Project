@@ -338,6 +338,9 @@ class Byakuya:
         self.y_velocity = 0 # y축 속도
         self.jump_start_y = self.y # 점프 시작 높이 (지면 높이)
 
+        self.health = 100 # 체력
+        self.invincible = False # 무적 상태
+        self.hit_timer = 0.0 # 피격 후 무적 시간 카운터
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
@@ -387,6 +390,23 @@ class Byakuya:
                    ((SDLK_KP_1 in self.pressed) or (SDLK_KP_7 in self.pressed)):
                     self.state_machine.handle_state_event(('PowerAttack', None))
         self.state_machine.update()
+
+        # 무적 시간 처리
+        if self.invincible:
+            self.hit_timer += game_framework.frame_time
+            if self.hit_timer >= 0.5: # 0.5초 무적
+                self.invincible = False
+                self.hit_timer = 0.0
+
+    def take_hit(self, damage):
+        if not self.invincible:
+            self.health -= damage
+            self.invincible = True
+            self.hit_timer = 0.0 # Reset timer
+            print(f"Byakuya hit! Health: {self.health}")
+            if self.health <= 0:
+                print("Byakuya is defeated!")
+                # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
         if event.type == SDL_KEYDOWN:
@@ -441,8 +461,89 @@ class Byakuya:
         draw_rectangle(*self.get_bb())
 
     def get_bb(self):
-        # Placeholder Bounding Box
-        return self.x-50, self.y-50, self.x+50, self.y+50
+        # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
+        # x는 중앙, y는 바닥에 위치하므로,
+        # left = self.x - width/2
+        # bottom = self.y
+        # right = self.x + width/2
+        # top = self.y + height
+        
+        width = 66
+        height = 100
+        
+        return self.x - width / 2, self.y, self.x + width / 2, self.y + height
+
+    def draw(self):
+        self.state_machine.draw()
+        draw_rectangle(*self.get_bb())
+        
+        # Draw attack bounding box for debugging
+        attack_bb = self.get_attack_bb()
+        if attack_bb:
+            if isinstance(attack_bb, list): # For skill, which can return multiple bounding boxes
+                for bb in attack_bb:
+                    draw_rectangle(*bb)
+            else:
+                draw_rectangle(*attack_bb)
+
+    def get_attack_bb(self):
+        state = self.state_machine.cur_state
+        if state == self.ATTACK:
+            # Byakuya_Attack_Effect.png (135x100)
+            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
+            # Active frames: 1 to 5 (char_frame_index)
+            if 1 <= int(state.frame) <= 5:
+                width, height = 135, 100
+                if self.face_dir == 1: # Facing right
+                    # Assume attack is slightly in front of the character
+                    return self.x + 20, self.y, self.x + 20 + width, self.y + height
+                else: # Facing left
+                    return self.x - 20 - width, self.y, self.x - 20, self.y + height
+            
+        elif state == self.POWERATTACK:
+            # Byakuya_PowerAttack_Effect.png (165x100)
+            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
+            # Active frames: 1 to 4 (char_frame_index)
+            if 1 <= int(state.frame) <= 4:
+                width, height = 165, 100
+                if self.face_dir == 1: # Facing right
+                    return self.x + 30, self.y, self.x + 30 + width, self.y + height
+                else: # Facing left
+                    return self.x - 30 - width, self.y, self.x - 30, self.y + height
+        
+        elif state == self.ULTIMATE:
+            # Byakuya_Ultimate_Effect.png (243x180)
+            # Effect is at self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20
+            # Active frames: 1 to 12 (char_frame_index)
+            if 1 <= int(state.frame) <= 12:
+                width, height = 243, 180
+                # Calculate effect's actual x position based on face_dir
+                effect_x = self.x + (self.face_dir * -50)
+                effect_y = self.y + (100 / 2) + 20
+                
+                if self.face_dir == 1: # Facing right
+                    return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
+                else: # Facing left
+                    return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
+
+        elif state == self.SKILL:
+            # Skill has moving projectiles, need to get BB for each active projectile
+            active_bbs = []
+            for effect in state.effects:
+                # Skill effect image: 88x8
+                # Draw at effect.x, effect.y
+                # Active frames: 1 to 4 (char_frame_index) for the main character animation,
+                # but the effect itself also has frames.
+                # Assuming the effect is active throughout its lifespan
+                if 1 <= int(state.frame) <= 4: # Only consider the skill's effect when Byakuya is actively animating the skill.
+                    effect_width, effect_height = 88, 8
+                    active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,
+                                       effect.x + effect_width / 2, effect.y + effect_height / 2))
+            return active_bbs if active_bbs else None # Return a list of BBs or None
+
+        return None # No attack active
 
     def set_opponent(self, opponent): # 상대 객체를 설정하는 메서드 추가
         self.opponent = opponent
+
+
