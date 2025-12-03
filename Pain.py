@@ -5,6 +5,8 @@ import os
 from state_machine import StateMachine
 from pico2d import SDL_GetKeyboardState
 import game_world
+import random
+import math
 
 # 키 상태 실시간 가져오기 (매 프레임 갱신 위해 전역 변수로 선언)
 keys = SDL_GetKeyboardState(None)
@@ -16,6 +18,32 @@ def load_resource(path):
 
 # 이벤트 체크
 time_out = lambda e: e[0] == 'TIMEOUT'
+
+# Pain Ultimate Constants
+ULTIMATE_STATE_START        = 0
+ULTIMATE_STATE_STONE_SPAWN  = 1
+ULTIMATE_STATE_STONE_COLLECT = 2
+ULTIMATE_STATE_ATTACK       = 3
+
+ULTIMATE_ANIM1_FRAMES = 3
+ULTIMATE_ANIM1_W, ULTIMATE_ANIM1_H = 106, 90
+
+ULTIMATE_ANIM2_FRAMES = 3
+ULTIMATE_ANIM2_W, ULTIMATE_ANIM2_H = 106, 75
+
+ULTIMATE_STONE_FRAMES = 3
+ULTIMATE_STONE_W, ULTIMATE_STONE_H = 558, 277 # Total sprite sheet dimensions
+ULTIMATE_STONE_FRAME_W = ULTIMATE_STONE_W // ULTIMATE_STONE_FRAMES # Single frame width
+ULTIMATE_STONE_FRAME_H = ULTIMATE_STONE_H # Single frame height
+
+MINI_STONE_COUNT_MAX = 10
+MINI_STONE_SPAWN_DELAY = 0.05 # seconds between each mini stone spawn
+MINI_STONE_COLLECT_SPEED = 200 # pixels per second
+MINI_STONE_SIZE = 15 # px (이전 5 -> 보기 쉽게 증가)
+MINI_STONE_MAX_DIST = 200 # Max spawn distance from Pain
+
+ULTIMATE_STONE_FLY_SPEED = 400 # pixels per second
+ULTIMATE_STONE_DISPLAY_SIZE = 400 # px, for when the stone flies towards opponent
 
 # 1P
 p1_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_a
@@ -70,15 +98,21 @@ class Jump:
     def __init__(self, p): self.p = p
     def enter(self, e):
         self.p.load_image('Pain_Jump.png')
-        self.p.vy = 800
+        self.p.y_velocity = self.p.jump_speed  # Use character's jump speed
         if self.p.dir != 0: self.p.face_dir = self.p.dir
-    def exit(self, e): self.p.y = self.p.jump_start_y # 지면 y좌표로 복귀
+    def exit(self, e):
+        self.p.y = self.p.jump_start_y # Snap to ground
+        self.p.y_velocity = 0 # Reset vertical velocity on exit
     def do(self):
-        self.p.y += self.p.vy * game_framework.frame_time
-        self.p.vy -= 2500 * game_framework.frame_time
-        if self.p.y <= self.p.jump_start_y: # 지면 y좌표 체크
+        # 중력 적용
+        self.p.y_velocity -= self.p.gravity * game_framework.frame_time
+        self.p.y += self.p.y_velocity * game_framework.frame_time
+
+        # 착지 확인
+        if self.p.y <= self.p.jump_start_y:
             self.p.y = self.p.jump_start_y
-            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+            self.p.y_velocity = 0 # Ensure velocity is zero on landing
+            self.p.state_machine.handle_state_event(('TIMEOUT', None)) # 점프 종료
     def draw(self):
         if self.p.face_dir == 1:
             self.p.image.clip_draw(0, 0, 60, 65, self.p.x, self.p.y + (65 / 2))
@@ -139,27 +173,272 @@ class PowerAttack:  # 강펀치
         else:
             self.p.image.clip_composite_draw(sx, 0, 116, 80, 0, 'h', self.p.x + offset_x, self.p.y + (80 / 2) + 10, 116, 80)
 
-class ShinraTensei:
-    def __init__(self, p): self.p = p; self.frame = 0
-    def enter(self, e): self.p.load_image('Pain_Shinra.png'); self.frame = 0
-    def exit(self, e): pass
-    def do(self):
-        self.frame += 12 * game_framework.frame_time * 1.3
-        if self.frame >= 11.9:
-            self.p.state_machine.handle_state_event(('TIMEOUT', None))
-    def draw(self):
-        sx = int(self.frame) * 220
-        if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 220, 220, self.p.x, self.p.y + (220 / 2) + 100, 660, 660) # y 보정 적용
-        else:
-            self.p.image.clip_composite_draw(sx, 0, 220, 220, 0, 'h', self.p.x, self.p.y + (220 / 2) + 100, 660, 660) # y 보정 적용
+class Ultimate: # Pain Ultimate
+    def __init__(self, p):
+        self.p = p
+        self.frame = 0
+        self.state = ULTIMATE_STATE_START
+        self.ultimate_stone = None
+        self.mini_stones = []
+        self.mini_stone_spawn_timer = 0
+        self.spawned_mini_stone_count = 0
+        self.hit_opponent_flag = False
 
+        self.ultimate_stone_img = None
+        self.mini_stone1_img = None
+        self.mini_stone2_img = None
+        self.mini_stone3_img = None
+
+    def enter(self, e):
+        # Load images (store image objects)
+        self.p.load_image('Pain_Ultimate1.png')
+        self.ultimate_stone_img = load_resource('Pain_Ultimate_Stone.png')
+        self.mini_stone1_img = load_resource('Mini_Stone1.png')
+        self.mini_stone2_img = load_resource('Mini_Stone2.png')
+        self.mini_stone3_img = load_resource('Mini_Stone3.png')
+
+        self.frame = 0
+        self.state = ULTIMATE_STATE_START
+        self.ultimate_stone = None
+        self.mini_stones = []
+        self.mini_stone_spawn_timer = 0
+        self.spawned_mini_stone_count = 0
+        self.hit_opponent_flag = False
+
+        # Create ultimate stone object (image object passed)
+        # Place the stone slightly in front of Pain based on facing direction so it appears aligned visually
+        offset_x = 120
+        self.ultimate_stone = PainUltimateStone(self.p.x + self.p.face_dir * offset_x,
+                                                self.p.y + self.p.body_height + (ULTIMATE_STONE_DISPLAY_SIZE/2),
+                                                self.ultimate_stone_img)
+        game_world.add_object(self.ultimate_stone, 2)
+
+    def exit(self, e):
+        if self.ultimate_stone:
+            try:
+                game_world.remove_object(self.ultimate_stone)
+            except Exception:
+                pass
+        for stone in list(self.mini_stones):
+            try:
+                game_world.remove_object(stone)
+            except Exception:
+                pass
+        self.ultimate_stone = None
+        self.mini_stones = []
+        self.p.load_image('Pain_Idle.png')
+
+    def do(self):
+        ANIMATION_SPEED = 8.0
+
+        # Advance frame depending on state
+        if self.state == ULTIMATE_STATE_START:
+            self.frame += game_framework.frame_time * ANIMATION_SPEED
+            if self.frame >= ULTIMATE_ANIM1_FRAMES:
+                self.state = ULTIMATE_STATE_STONE_SPAWN
+                self.frame = 0
+
+        elif self.state == ULTIMATE_STATE_STONE_SPAWN:
+            # animate Pain_Ultimate1
+            self.frame = (self.frame + game_framework.frame_time * ANIMATION_SPEED) % ULTIMATE_ANIM1_FRAMES
+            self.mini_stone_spawn_timer += game_framework.frame_time
+            if self.mini_stone_spawn_timer >= MINI_STONE_SPAWN_DELAY and self.spawned_mini_stone_count < MINI_STONE_COUNT_MAX:
+                stone_images = [self.mini_stone1_img, self.mini_stone2_img, self.mini_stone3_img]
+                chosen_image = random.choice(stone_images)
+                spawn_x = self.p.x + random.uniform(-MINI_STONE_MAX_DIST, MINI_STONE_MAX_DIST)
+                spawn_y = self.p.y + random.uniform(self.p.body_height, self.p.body_height + MINI_STONE_MAX_DIST)
+                mini_stone = MiniStone(spawn_x, spawn_y, self.ultimate_stone.x, self.ultimate_stone.y, chosen_image, delay=0.0)
+                self.mini_stones.append(mini_stone)
+                game_world.add_object(mini_stone, 2)
+                self.spawned_mini_stone_count += 1
+                self.mini_stone_spawn_timer = 0
+
+            # when all spawned and absorbed -> collect
+            if self.spawned_mini_stone_count >= MINI_STONE_COUNT_MAX and all(not s.active for s in self.mini_stones):
+                self.state = ULTIMATE_STATE_STONE_COLLECT
+                self.frame = 0
+
+        elif self.state == ULTIMATE_STATE_STONE_COLLECT:
+            self.frame = (self.frame + game_framework.frame_time * ANIMATION_SPEED) % ULTIMATE_ANIM1_FRAMES
+            all_collected = all(not s.active for s in self.mini_stones)
+            if all_collected:
+                self.state = ULTIMATE_STATE_ATTACK
+                self.p.load_image('Pain_Ultimate2.png')
+                self.frame = 0
+
+        elif self.state == ULTIMATE_STATE_ATTACK:
+            self.frame += game_framework.frame_time * ANIMATION_SPEED
+            # start flying halfway through ultimate2 animation
+            if self.ultimate_stone and not self.ultimate_stone.flying and self.frame >= (ULTIMATE_ANIM2_FRAMES * 0.5):
+                if self.p.opponent:
+                    self.ultimate_stone.start_flying(self.p.opponent.x, self.p.opponent.y + self.p.opponent.body_height/2)
+                else:
+                    self.ultimate_stone.start_flying(self.p.x + self.p.face_dir * 400, self.p.y + 100)
+
+            if self.ultimate_stone and self.ultimate_stone.hit and not self.hit_opponent_flag:
+                if self.p.opponent:
+                    self.p.opponent.take_hit(30)
+                self.hit_opponent_flag = True
+                try:
+                    game_world.remove_object(self.ultimate_stone)
+                except Exception:
+                    pass
+                self.ultimate_stone = None
+
+            if self.frame >= ULTIMATE_ANIM2_FRAMES and not self.ultimate_stone:
+                self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+        # update ultimate objects
+        if self.ultimate_stone:
+            if not self.ultimate_stone.flying:
+                # keep the stone in front of Pain while charging
+                offset_x = 120
+                self.ultimate_stone.set_position(self.p.x + self.p.face_dir * offset_x,
+                                                 self.p.y + self.p.body_height + (ULTIMATE_STONE_DISPLAY_SIZE/2))
+            self.ultimate_stone.update()
+        for s in list(self.mini_stones):
+            s.update()
+
+        # Update ultimate stone frame based on collected mini stones count
+        if self.ultimate_stone:
+            # Use different mapping depending on phase:
+            # - During STONE_SPAWN: show growth according to spawned count (visual accumulation)
+            # - During STONE_COLLECT / ATTACK: show progress according to collected count
+            spawned = self.spawned_mini_stone_count
+            collected = sum(1 for s in self.mini_stones if not s.active)
+            if self.state == ULTIMATE_STATE_STONE_SPAWN:
+                ratio = spawned / max(1, MINI_STONE_COUNT_MAX)
+            else:
+                ratio = collected / max(1, MINI_STONE_COUNT_MAX)
+
+            idx = int(ratio * ULTIMATE_STONE_FRAMES)
+            if idx >= ULTIMATE_STONE_FRAMES:
+                idx = ULTIMATE_STONE_FRAMES - 1
+            try:
+                self.ultimate_stone.frame = idx
+            except Exception:
+                pass
+
+    def draw(self):
+        # draw Pain's ultimate animation frames
+        img = self.p.image
+        if not img:
+            return
+        if self.state in (ULTIMATE_STATE_START, ULTIMATE_STATE_STONE_SPAWN, ULTIMATE_STATE_STONE_COLLECT):
+            w, h, frames = ULTIMATE_ANIM1_W, ULTIMATE_ANIM1_H, ULTIMATE_ANIM1_FRAMES
+        else:
+            w, h, frames = ULTIMATE_ANIM2_W, ULTIMATE_ANIM2_H, ULTIMATE_ANIM2_FRAMES
+        sx = (int(self.frame) % frames) * w
+        if self.p.face_dir == 1:
+            img.clip_draw(sx, 0, w, h, self.p.x, self.p.y + (h/2))
+        else:
+            img.clip_composite_draw(sx, 0, w, h, 0, 'h', self.p.x, self.p.y + (h/2), w, h)
+
+        # mini stones and ultimate stone are game world objects and will be drawn by game_world.render()
+
+
+# Ultimate effect classes
+class MiniStone:
+    def __init__(self, x, y, target_x, target_y, image_obj, delay=0.0):
+        self.x, self.y = x, y
+        self.target_x, self.target_y = target_x, target_y
+        self.image = image_obj
+        self.delay = delay
+        self.active = True if self.delay <= 0 else False
+        self.speed = MINI_STONE_COLLECT_SPEED
+        self.size = MINI_STONE_SIZE
+        self.angle = 0.0
+
+    def update(self):
+        if self.delay > 0:
+            self.delay -= game_framework.frame_time
+            if self.delay <= 0:
+                self.active = True
+            return
+        if not self.active:
+            return
+        dx = self.target_x - self.x
+        dy = self.target_y - self.y
+        dist = math.hypot(dx, dy)
+        if dist <= 1e-6:
+            self.x, self.y = self.target_x, self.target_y
+            self.active = False
+            return
+        travel = self.speed * game_framework.frame_time
+        if dist <= travel:
+            self.x, self.y = self.target_x, self.target_y
+            self.active = False
+        else:
+            self.x += dx / dist * travel
+            self.y += dy / dist * travel
+        self.angle = (self.angle + game_framework.frame_time * 360) % 360
+
+    def draw(self):
+        if self.active or self.delay > 0:
+            try:
+                self.image.composite_draw(self.angle, '', self.x, self.y, self.size, self.size)
+            except Exception:
+                self.image.draw(self.x, self.y, self.size, self.size)
+
+
+class PainUltimateStone:
+    def __init__(self, x, y, image_obj):
+        self.x, self.y = x, y
+        self.image = image_obj
+        self.frame_w = ULTIMATE_STONE_FRAME_W
+        self.frame_h = ULTIMATE_STONE_FRAME_H
+        self.size = ULTIMATE_STONE_DISPLAY_SIZE
+        self.frame = 0
+        self.flying = False
+        self.target_x = 0
+        self.target_y = 0
+        self.hit = False
+
+    def set_position(self, x, y):
+        if not self.flying:
+            self.x, self.y = x, y
+
+    def start_flying(self, tx, ty):
+        self.flying = True
+        self.target_x, self.target_y = tx, ty
+
+    def update(self):
+        if self.flying and not self.hit:
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            dist = math.hypot(dx, dy)
+            if dist <= 1e-6:
+                self.x, self.y = self.target_x, self.target_y
+                self.hit = True
+                return
+            travel = ULTIMATE_STONE_FLY_SPEED * game_framework.frame_time
+            if dist <= travel:
+                self.x, self.y = self.target_x, self.target_y
+                self.hit = True
+            else:
+                self.x += dx / dist * travel
+                self.y += dy / dist * travel
+
+    def draw(self):
+        if self.hit or not self.image:
+            return
+        try:
+            # draw frame indicated by self.frame
+            sx = int(self.frame) * self.frame_w
+            self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y, self.size, self.size)
+        except Exception:
+            self.image.draw(self.x, self.y, self.size, self.size)
+
+# Skill 상태 클래스 (누락되어 NameError 발생하므로 추가)
 class Skill:
-    def __init__(self, p): self.p = p; self.frame = 0
+    def __init__(self, p):
+        self.p = p
+        self.frame = 0
     def enter(self, e):
         self.p.load_image('Pain_Skill.png')
         self.frame = 0
-    def exit(self, e): pass
+    def exit(self, e):
+        pass
     def do(self):
         self.frame += 10 * game_framework.frame_time * 1.5
         if self.frame >= 9.9:
@@ -171,7 +450,6 @@ class Skill:
         else:
             self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y + (85 / 2), 100, 85)
 
-
 # === 메인 클래스 Pain ===
 # python
 class Pain:
@@ -180,12 +458,16 @@ class Pain:
         self.x, self.y = x, y
         self.face_dir = 1 if player == 1 else -1
         self.dir = 0
-        self.vy = 0
         self.image = None
         self.input_buffer = []
-        # 눌린 키를 추적하는 집합 (이게 핵심)
         self.pressed = set()
         self.opponent = None # 상대 객체 초기화
+
+        self.jump_speed = 800 # Initial jump velocity (consistent with Pain's original value)
+        self.gravity = 2500 # Gravity acceleration (consistent with Pain's original value)
+        self.y_velocity = 0 # Vertical velocity for jumping
+        self.jump_start_y = self.y # Ground level for jumping
+        self.body_height = 100 # Assuming a standard body height for Y offset calculations (consistent with Byakuya)
 
         self.health = 100 # 체력
         self.invincible = False # 무적 상태
@@ -197,7 +479,7 @@ class Pain:
         self.PUNCH = Punch(self)
         self.DASH = Dash(self)
         self.POWERATTACK = PowerAttack(self)
-        self.SHINRA = ShinraTensei(self)
+        self.Ultimate = Ultimate(self)
         self.SKILL = Skill(self)
 
         self.state_machine = StateMachine(self.IDLE, {
@@ -208,7 +490,7 @@ class Pain:
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
-                lambda e: e[0] == 'SHINRA': self.SHINRA,
+                lambda e: e[0] == 'Ultimate': self.Ultimate,
                 lambda e: e[0] == 'SKILL': self.SKILL,
             },
             self.RUN: {
@@ -217,14 +499,14 @@ class Pain:
                 lambda e: (self.player == 1 and p1_weak_punch(e)) or (self.player == 2 and p2_weak_punch(e)): self.PUNCH,
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
-                lambda e: e[0] == 'SHINRA': self.SHINRA,
+                lambda e: e[0] == 'Ultimate': self.Ultimate,
                 lambda e: e[0] == 'SKILL': self.SKILL,
             },
             self.JUMP: {time_out: self.IDLE},
             self.PUNCH: {time_out: self.IDLE},
             self.DASH: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
-            self.SHINRA: {time_out: self.IDLE},
+            self.Ultimate: {time_out: self.IDLE},
             self.SKILL: {time_out: self.IDLE},
         })
 
@@ -299,8 +581,12 @@ class Pain:
                     seq = ''.join(self.input_buffer[-3:])
                     if seq in ['236', '263']:
                         self.input_buffer.clear()
-                        self.state_machine.handle_state_event(('SHINRA', None))
+                        self.state_machine.handle_state_event(('Ultimate', None))
                         return
+                elif key == SDLK_i: # Direct Ultimate trigger for P1
+                    self.input_buffer.clear()
+                    self.state_machine.handle_state_event(('Ultimate', None))
+                    return
             else:
                 if key in [SDLK_DOWN, SDLK_KP_5]:
                     self.input_buffer.append('2')
@@ -318,7 +604,7 @@ class Pain:
                     seq = ''.join(self.input_buffer[-3:])
                     if seq in ['236', '263']:
                         self.input_buffer.clear()
-                        self.state_machine.handle_state_event(('SHINRA', None))
+                        self.state_machine.handle_state_event(('Ultimate', None))
                         return
 
             if len(self.input_buffer) > 12:
@@ -336,7 +622,6 @@ class Pain:
 
     def draw(self):
         self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
 
     def get_bb(self):
         # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
@@ -370,10 +655,10 @@ class Pain:
                 # Y offset is (80 / 2) + 10 from self.p.y
                 # bottom = self.y + 10
                 
-                width_right = 93
-                width_left = 110
-                height = 80
-                offset_x = 30
+                width_right = 70
+                width_left = 80
+                height = 60
+                offset_x = 20
                 bottom_y = self.y + 10
                 
                 if self.face_dir == 1: # Facing right
@@ -395,27 +680,21 @@ class Pain:
                 # Y offset is (80 / 2) + 10 from self.p.y
                 # bottom = self.y + 10
                 
-                width = 116
-                height = 80
-                offset_x_val = 70 * self.face_dir
+                width = 90
+                height = 60
+                offset_x_val = 50 * self.face_dir
                 bottom_y = self.y + 10
                 
                 return (self.x + offset_x_val - width / 2, bottom_y,
                         self.x + offset_x_val + width / 2, bottom_y + height)
 
-        elif state == self.SHINRA:
-            # Pain_Shinra.png. Drawn as 660x660
-            # Active frames: 4 to 10
-            if 4 <= int(state.frame) <= 10:
-                # Draw position is self.p.x, self.p.y + (220 / 2) + 100
-                # Which means center is self.x, self.y + 110 + 100 = self.y + 210
-                
-                width = 660
-                height = 660
-                center_y = self.y + 210
-                
-                return (self.x - width / 2, center_y - height / 2,
-                        self.x + width / 2, center_y + height / 2)
+        elif state == self.Ultimate: # Corrected placement
+            if state.ultimate_stone and state.ultimate_stone.flying and not state.ultimate_stone.hit:
+                # Return the bounding box of the flying ultimate stone
+                stone_x, stone_y = state.ultimate_stone.x, state.ultimate_stone.y
+                stone_size = state.ultimate_stone.size
+                return (stone_x - stone_size / 2, stone_y - stone_size / 2,
+                        stone_x + stone_size / 2, stone_y + stone_size / 2)
 
         elif state == self.SKILL:
             # Pain_Skill.png. Character clip_draw is 100x85

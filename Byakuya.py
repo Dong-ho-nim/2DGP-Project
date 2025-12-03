@@ -26,6 +26,15 @@ p2_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key
 p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]
 p2_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
 
+def collide(a, b):
+    left_a, bottom_a, right_a, top_a = a
+    left_b, bottom_b, right_b, top_b = b
+    if left_a > right_b: return False
+    if right_a < left_b: return False
+    if top_a < bottom_b: return False
+    if bottom_a > top_b: return False
+    return True
+
 # === 이펙트 클래스 ===
 class Effect:
     def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0):
@@ -196,10 +205,14 @@ class Ultimate:
         self.p = p
         self.frame = 0
         self.effect = None # 이펙트 추가
+        self.hit_landed = False
+        self.hit_checked = False
 
     def enter(self, e):
         self.p.load_image('Byakuya_Ultimate.png')
         self.frame = 0
+        self.hit_landed = False
+        self.hit_checked = False
         # Ultimate 이펙트 생성 (7 프레임, 250x250 가정)
         # 이펙트 y 위치는 캐릭터의 기본 y + (캐릭터 높이/2)에 얼라인
         self.effect = Effect(self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20, 'Byakuya_Ultimate_Effect.png', 12, 243, 180)
@@ -209,12 +222,21 @@ class Ultimate:
         self.effect = None # 이펙트 소멸
 
     def do(self):
-        # Byakuya_Ultimate.png의 애니메이션 프레임은 14프레임으로 가정 (총 너비 3839, 높이 510)
-        # 프레임 너비는 3839 / 14 = 274 (내림)
-        animation_speed_factor = 1.0 # 기본 속도
-        # 마지막 4프레임 (총 14프레임 중 10, 11, 12, 13 프레임)인지 확인
-        if int(self.frame) >= 10:
-            animation_speed_factor = 0.5 # 속도를 늦춥니다.
+        # Only check for hit once on the first active frame
+        if not self.hit_checked and int(self.frame) >= 1:
+            self.hit_checked = True
+            attack_bb = self.p.get_attack_bb()
+            if attack_bb:
+                opponent_bb = self.p.opponent.get_bb()
+                if opponent_bb and collide(attack_bb, opponent_bb):
+                    self.hit_landed = True
+
+        # Determine animation speed
+        animation_speed_factor = 1.0  # Default speed
+        
+        # If the attack landed and we are in the last 4 frames, slow down
+        if self.hit_landed and int(self.frame) >= 10:
+            animation_speed_factor = 0.1
 
         self.frame += 14 * game_framework.frame_time * animation_speed_factor
         if self.frame >= 13.9: # 프레임 수에 맞춰 조건 변경 (0-13)
@@ -461,13 +483,7 @@ class Byakuya:
         draw_rectangle(*self.get_bb())
 
     def get_bb(self):
-        # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
-        # x는 중앙, y는 바닥에 위치하므로,
-        # left = self.x - width/2
-        # bottom = self.y
-        # right = self.x + width/2
-        # top = self.y + height
-        
+
         width = 66
         height = 100
         
@@ -493,48 +509,39 @@ class Byakuya:
             # Effect is drawn at self.p.x, self.p.y + (100 / 2)
             # Active frames: 1 to 5 (char_frame_index)
             if 1 <= int(state.frame) <= 5:
-                width, height = 135, 100
+                width, height = 100, 80
                 if self.face_dir == 1: # Facing right
-                    # Assume attack is slightly in front of the character
-                    return self.x + 20, self.y, self.x + 20 + width, self.y + height
+                    return self.x + 10, self.y, self.x + 70, self.y + 80
                 else: # Facing left
-                    return self.x - 20 - width, self.y, self.x - 20, self.y + height
+                    return self.x - 70, self.y, self.x - 10, self.y + 80
             
         elif state == self.POWERATTACK:
             # Byakuya_PowerAttack_Effect.png (165x100)
             # Effect is drawn at self.p.x, self.p.y + (100 / 2)
             # Active frames: 1 to 4 (char_frame_index)
             if 1 <= int(state.frame) <= 4:
-                width, height = 165, 100
+                width, height = 100, 80
                 if self.face_dir == 1: # Facing right
-                    return self.x + 30, self.y, self.x + 30 + width, self.y + height
+                    return self.x + 10, self.y, self.x + 70, self.y + 80
                 else: # Facing left
-                    return self.x - 30 - width, self.y, self.x - 30, self.y + height
+                    return self.x - 70, self.y, self.x - 10, self.y + 80
         
         elif state == self.ULTIMATE:
             # Byakuya_Ultimate_Effect.png (243x180)
             # Effect is at self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20
             # Active frames: 1 to 12 (char_frame_index)
-            if 1 <= int(state.frame) <= 12:
+            if int(state.frame) == 1 or 12 <= int(state.frame) <= 14:
                 width, height = 243, 180
                 # Calculate effect's actual x position based on face_dir
-                effect_x = self.x + (self.face_dir * -50)
+                effect_x = self.x + (self.face_dir * 50)
                 effect_y = self.y + (100 / 2) + 20
                 
-                if self.face_dir == 1: # Facing right
-                    return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
-                else: # Facing left
-                    return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
+                return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
 
         elif state == self.SKILL:
             # Skill has moving projectiles, need to get BB for each active projectile
             active_bbs = []
             for effect in state.effects:
-                # Skill effect image: 88x8
-                # Draw at effect.x, effect.y
-                # Active frames: 1 to 4 (char_frame_index) for the main character animation,
-                # but the effect itself also has frames.
-                # Assuming the effect is active throughout its lifespan
                 if 1 <= int(state.frame) <= 4: # Only consider the skill's effect when Byakuya is actively animating the skill.
                     effect_width, effect_height = 88, 8
                     active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,

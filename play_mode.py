@@ -3,7 +3,12 @@ import game_framework
 import game_world
 from Pain import Pain
 from Byakuya import Byakuya
+from Naruto import Naruto
+from Sado import Sado
 from BackGround import BackGround
+
+p1_char_name = None
+p2_char_name = None
 
 p1 = None
 p2 = None
@@ -18,20 +23,32 @@ def collide(bb1, bb2):
     return True
 
 def enter():
-    global p1, p2
+    global p1, p2, p1_char_name # Ensure p1_char_name is global here
     game_world.clear()
     game_world.add_object(BackGround(), 0)
 
-    # p1 is Byakuya, p2 is Pain
-    p1 = Byakuya(player=1, x=900, y=50)
-    p2 = Pain(player=2, x=300, y=50)
+    p1_char_name = 'Pain' # Force P1 to be Pain
+    
+    CHAR_CLASSES = {
+        'Naruto': Naruto,
+        'Pain': Pain,
+        'Byakuya': Byakuya,
+        'Sado': Sado
+        # Add other character classes here as they are created
+    }
+
+    # Default to Byakuya and Pain if names aren't found
+    p1_class = CHAR_CLASSES.get(p1_char_name, Byakuya)
+    p2_class = CHAR_CLASSES.get(p2_char_name, Pain)
+
+    p1 = p1_class(player=1, x=900, y=50)
+    p2 = p2_class(player=2, x=300, y=50)
 
     p1.set_opponent(p2)
     p2.set_opponent(p1)
 
     game_world.add_object(p1, 1)
     game_world.add_object(p2, 1)
-    # game_world.add_collision_pair('p1:p2', p1, p2) # Collision logic deferred
 
 def exit():
     game_world.clear()

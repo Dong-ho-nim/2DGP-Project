@@ -1,6 +1,5 @@
 # game_world.py
-# game_world.py (손석민 교수님 정식 버전)
-objects = [[], []]  # 0: 배경, 1: 캐릭터
+objects = [[], [], []]  # 0: 배경, 1: 캐릭터, 2: 이펙트/공격물
 collision_pairs = {}
 
 def add_object(o, layer):
