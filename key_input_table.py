@@ -29,12 +29,10 @@ KEY_MAP = {
         'RIGHT': SDLK_RIGHT,
         'DOWN':  SDLK_DOWN,
         'UP':    SDLK_UP,
-        'LP':    SDLK_KP_4,
-        'MP':    SDLK_KP_5,
-        'HP':    SDLK_KP_6,
-        'LK':    SDLK_KP_1,
-        'MK':    SDLK_KP_2,
-        'HK':    SDLK_KP_3,
+        'ATTACK': SDLK_1,    # 공격
+        'JUMP':  SDLK_2,     # 점프
+        'DASH':  SDLK_3,     # 대시
+        'ULTIMATE': SDLK_5,  # 얼티밋
     }
 }
 

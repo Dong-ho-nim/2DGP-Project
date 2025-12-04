@@ -7,6 +7,7 @@ from pico2d import SDL_GetKeyboardState
 import game_world
 import random
 import math
+from key_input_table import KEY_MAP
 
 # 키 상태 실시간 가져오기 (매 프레임 갱신 위해 전역 변수로 선언)
 keys = SDL_GetKeyboardState(None)
@@ -53,11 +54,11 @@ p1_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key
 p1_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_l
 
 # 2P
-p2_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT, SDLK_KP_4]
-p2_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT, SDLK_KP_6]
+p2_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT]
+p2_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT]
 p2_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_KP_2
-p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]
-p2_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
+p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1]
+p2_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3]
 
 # === 상태 클래스들 ===
 class Idle:
@@ -247,7 +248,8 @@ class Ultimate: # Pain Ultimate
                 chosen_image = random.choice(stone_images)
                 spawn_x = self.p.x + random.uniform(-MINI_STONE_MAX_DIST, MINI_STONE_MAX_DIST)
                 spawn_y = self.p.y + random.uniform(self.p.body_height, self.p.body_height + MINI_STONE_MAX_DIST)
-                mini_stone = MiniStone(spawn_x, spawn_y, self.ultimate_stone.x, self.ultimate_stone.y, chosen_image, delay=0.0)
+                # Pass the ultimate stone object as the target so mini stones track the stone's current position
+                mini_stone = MiniStone(spawn_x, spawn_y, self.ultimate_stone, None, chosen_image, delay=0.0)
                 self.mini_stones.append(mini_stone)
                 game_world.add_object(mini_stone, 2)
                 self.spawned_mini_stone_count += 1
@@ -341,7 +343,15 @@ class Ultimate: # Pain Ultimate
 class MiniStone:
     def __init__(self, x, y, target_x, target_y, image_obj, delay=0.0):
         self.x, self.y = x, y
-        self.target_x, self.target_y = target_x, target_y
+        # target_x may be either a reference to the ultimate stone object or a numeric x coordinate
+        # If target_x is an object with .x/.y, store as target_obj so the mini stone follows the moving stone
+        if hasattr(target_x, 'x') and hasattr(target_x, 'y'):
+            self.target_obj = target_x
+            self.target_x = None
+            self.target_y = None
+        else:
+            self.target_obj = None
+            self.target_x, self.target_y = target_x, target_y
         self.image = image_obj
         self.delay = delay
         self.active = True if self.delay <= 0 else False
@@ -357,16 +367,22 @@ class MiniStone:
             return
         if not self.active:
             return
-        dx = self.target_x - self.x
-        dy = self.target_y - self.y
+        # determine current target position (follow ultimate stone if provided)
+        if self.target_obj is not None:
+            tx, ty = self.target_obj.x, self.target_obj.y
+        else:
+            tx, ty = self.target_x, self.target_y
+
+        dx = tx - self.x
+        dy = ty - self.y
         dist = math.hypot(dx, dy)
         if dist <= 1e-6:
-            self.x, self.y = self.target_x, self.target_y
+            self.x, self.y = tx, ty
             self.active = False
             return
         travel = self.speed * game_framework.frame_time
         if dist <= travel:
-            self.x, self.y = self.target_x, self.target_y
+            self.x, self.y = tx, ty
             self.active = False
         else:
             self.x += dx / dist * travel
@@ -434,15 +450,47 @@ class Skill:
     def __init__(self, p):
         self.p = p
         self.frame = 0
+        # 이동 관련
+        self.move_timer = 0.0
+        self.move_duration = 0.20  # 초
+        self.move_speed = 300      # 픽셀/초
+        self.move_dir = 0
+
     def enter(self, e):
         self.p.load_image('Pain_Skill.png')
         self.frame = 0
+        # 상대가 있으면 상대의 좌표로 이동 (상대 face_dir에 따라 약간의 오프셋 적용)
+        if getattr(self.p, 'opponent', None) and getattr(self.p.opponent, 'face_dir', None) is not None:
+            opp = self.p.opponent
+            if opp.face_dir == 1:
+                target_x = opp.x - 13
+            else:
+                target_x = opp.x + 13
+            # 화면 경계 내로 클램프
+            self.p.x = max(100, min(1100, target_x))
+        else:
+            # 상대 정보가 없으면 기존 동작 유지: 현재 바라보는 방향과 반대 방향으로 짧게 이동
+            self.move_dir = - self.p.face_dir
+            self.move_timer = self.move_duration
+
     def exit(self, e):
-        pass
+        self.move_timer = 0.0
+        self.move_dir = 0
+
     def do(self):
+        # 이동 처리 (진입 후 짧은 시간 동안)
+        if self.move_timer > 0:
+            dx = self.move_dir * self.move_speed * game_framework.frame_time
+            self.p.x += dx
+            # 화면 경계 내로 제한
+            self.p.x = max(100, min(1100, self.p.x))
+            self.move_timer -= game_framework.frame_time
+
+        # 애니메이션 진행
         self.frame += 10 * game_framework.frame_time * 1.5
         if self.frame >= 9.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
     def draw(self):
         sx = int(self.frame) * 100
         if self.p.face_dir == 1:
@@ -516,14 +564,9 @@ class Pain:
     def update(self):
         # 실시간 키 상태 대신 handle_event에서 관리하는 self.pressed 사용
         if self.state_machine.cur_state in [self.IDLE, self.RUN]:
-            if self.player == 2:
-                if ((SDLK_DOWN in self.pressed) or (SDLK_KP_5 in self.pressed)) and \
-                   ((SDLK_KP_1 in self.pressed) or (SDLK_KP_7 in self.pressed)):
-                    self.state_machine.handle_state_event(('PowerAttack', None))
-
-        # 방향 처리 유지
-        if self.state_machine.cur_state == self.RUN:
-            self.face_dir = self.dir
+            # 방향 처리 유지
+            if self.state_machine.cur_state == self.RUN:
+                self.face_dir = self.dir
 
         self.state_machine.update()
 
@@ -588,7 +631,32 @@ class Pain:
                     self.state_machine.handle_state_event(('Ultimate', None))
                     return
             else:
-                if key in [SDLK_DOWN, SDLK_KP_5]:
+                # DEBUG: P2 관심 키(ATTACK/ULTIMATE/키패드) 입력 로그
+                if key in (KEY_MAP['P2']['ATTACK'], KEY_MAP['P2']['ULTIMATE'], SDLK_KP_1, SDLK_KP_5, SDLK_5):
+                    print(f"[DEBUG][P2] key={key}, pressed_set={self.pressed}")
+                # P2: 공격/얼티밋 우선 처리 (키패드 포함)
+                if key in (KEY_MAP['P2']['ATTACK'], SDLK_KP_1):
+                    # Hold 기반 분기: 아래 보유 -> PowerAttack, 위 보유 -> SKILL
+                    if SDLK_DOWN in self.pressed or SDLK_KP_2 in self.pressed:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('PowerAttack', None))
+                        return
+                    if SDLK_UP in self.pressed or SDLK_KP_8 in self.pressed:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('SKILL', None))
+                        return
+                    # else: 약공격은 기존 INPUT 이벤트로 처리
+
+                # Ultimate: 메인 키 5 또는 키패드 5 모두 허용
+                elif key in (KEY_MAP['P2']['ULTIMATE'], SDLK_KP_5, SDLK_5):
+                    self.input_buffer.clear()
+                    self.state_machine.handle_state_event(('Ultimate', None))
+                    return
+
+                # P2 방향키/버퍼 기록 (방향키와 키패드 유사 키 지원)
+                if key in [SDLK_UP, SDLK_KP_8]:
+                    self.input_buffer.append('8')
+                elif key in [SDLK_DOWN, SDLK_KP_2]:
                     self.input_buffer.append('2')
                 elif key in [SDLK_RIGHT, SDLK_KP_6]:
                     if self.input_buffer and self.input_buffer[-1] == '2':
@@ -600,12 +668,6 @@ class Pain:
                         self.input_buffer.append('1')
                     else:
                         self.input_buffer.append('4')
-                elif key in [SDLK_KP_1, SDLK_KP_7]:
-                    seq = ''.join(self.input_buffer[-3:])
-                    if seq in ['236', '263']:
-                        self.input_buffer.clear()
-                        self.state_machine.handle_state_event(('Ultimate', None))
-                        return
 
             if len(self.input_buffer) > 12:
                 self.input_buffer = self.input_buffer[-12:]
@@ -619,9 +681,6 @@ class Pain:
                 self.pressed.remove(event.key)
             # 키업도 상태머신에 전달
             self.state_machine.handle_state_event(('INPUT', event))
-
-    def draw(self):
-        self.state_machine.draw()
 
     def get_bb(self):
         # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
