@@ -24,7 +24,7 @@ p1_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key
 p2_left_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_LEFT, SDLK_KP_4]
 p2_right_down  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_RIGHT, SDLK_KP_6]
 p2_jump_down   = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key==SDLK_KP_2
-p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLK_KP_7]
+p2_weak_punch  = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_1, SDLKK_KP_7]
 p2_dash        = lambda e: e[0]=='INPUT' and e[1].type==SDL_KEYDOWN and e[1].key in [SDLK_KP_3, SDLK_KP_9]
 
 def collide(a, b):
@@ -344,8 +344,8 @@ class Jump:
             self.p.image.clip_composite_draw(0, 0, 61, 95, 0, 'h', self.p.x, self.p.y + (95 / 2), 61, 95)
 
 
-# === 메인 클래스 Byakuya ===
-class Byakuya:
+# === 메인 클래스 Sado ===
+class Sado:
     def __init__(self, player=1, x=200, y=250):
         self.player = player
         self.x, self.y = x, y
@@ -422,9 +422,9 @@ class Byakuya:
             self.health -= damage
             self.invincible = True
             self.hit_timer = 0.0 # Reset timer
-            print(f"Byakuya hit! Health: {self.health}")
+            print(f"Sado hit! Health: {self.health}")
             if self.health <= 0:
-                print("Byakuya is defeated!")
+                print("Sado is defeated!")
                 # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
@@ -436,8 +436,7 @@ class Byakuya:
                     self.input_buffer.append('w')
                 elif key == SDLK_s:
                     self.input_buffer.append('2')
-                elif key == SDLK_j:
-                    # Skill: w -> j
+                elif key == SDLK_j: # Skill: w -> j
                     if self.input_buffer and self.input_buffer[-1] == 'w':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('SKILL', None))
@@ -451,9 +450,9 @@ class Byakuya:
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
             else: # Player 2
-                if key == SDLK_UP: # Skill 트리거 시작
+                if key == SDLK_UP: # Skill 트리거 시작 (input buffer)
                     self.input_buffer.append('8')
-                elif key in [SDLK_DOWN, SDLK_KP_5]:
+                elif key == SDLK_DOWN: # PowerAttack 트리거 시작 (input buffer)
                     self.input_buffer.append('2')
                 elif key == KEY_MAP['P2']['ATTACK']: # SDLK_1
                     # Skill: UP -> ATTACK (input_buffer: '8')
@@ -486,7 +485,13 @@ class Byakuya:
         draw_rectangle(*self.get_bb())
 
     def get_bb(self):
-
+        # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
+        # x는 중앙, y는 바닥에 위치하므로,
+        # left = self.x - width/2
+        # bottom = self.y
+        # right = self.x + width/2
+        # top = self.y + height
+        
         width = 66
         height = 100
         
@@ -537,7 +542,7 @@ class Byakuya:
                 width, height = 243, 180
                 # Calculate effect's actual x position based on face_dir
                 effect_x = self.x + (self.face_dir * 50)
-                effect_y = self.y + (100 / 2) + 20
+                effect_y = self.p.y + (100 / 2) + 20
                 
                 return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
 
@@ -545,6 +550,11 @@ class Byakuya:
             # Skill has moving projectiles, need to get BB for each active projectile
             active_bbs = []
             for effect in state.effects:
+                # Skill effect image: 88x8
+                # Draw at effect.x, effect.y
+                # Active frames: 1 to 4 (char_frame_index) for the main character animation,
+                # but the effect itself also has frames.
+                # Assuming the effect is active throughout its lifespan
                 if 1 <= int(state.frame) <= 4: # Only consider the skill's effect when Byakuya is actively animating the skill.
                     effect_width, effect_height = 88, 8
                     active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,
@@ -555,5 +565,3 @@ class Byakuya:
 
     def set_opponent(self, opponent): # 상대 객체를 설정하는 메서드 추가
         self.opponent = opponent
-
-

@@ -10,8 +10,20 @@ from BackGround import BackGround
 p1_char_name = None
 p2_char_name = None
 
+# Character icon mapping
+CHARACTER_ICONS = {
+    'Pain': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Pain.png',
+    'Naruto': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Naruto.png',
+    'Byakuya': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png',
+    'Sado': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Yasutora Sado.png',
+}
+
 p1 = None
 p2 = None
+
+p1_character_icon_image = None
+p2_character_icon_image = None
+
 
 def collide(bb1, bb2):
     left1, bottom1, right1, top1 = bb1
@@ -23,12 +35,21 @@ def collide(bb1, bb2):
     return True
 
 def enter():
-    global p1, p2, p1_char_name # Ensure p1_char_name is global here
+    global p1, p2, p1_char_name, p2_char_name, p1_character_icon_image, p2_character_icon_image # Ensure globals are declared
     game_world.clear()
     game_world.add_object(BackGround(), 0)
 
-    p1_char_name = 'Pain' # Force P1 to be Pain
+    # Temporary hardcoding for p1_char_name and p2_char_name for testing
+    # In a full game, these would be set by the character selection screen
+    if p1_char_name is None: # Only set if not already set by selection screen
+        p1_char_name = 'Pain'
+    if p2_char_name is None: # Only set if not already set by selection screen
+        p2_char_name = 'Naruto'
     
+    # Load character icon images based on selected characters
+    p1_character_icon_image = load_image(CHARACTER_ICONS.get(p1_char_name))
+    p2_character_icon_image = load_image(CHARACTER_ICONS.get(p2_char_name))
+
     CHAR_CLASSES = {
         'Naruto': Naruto,
         'Pain': Pain,
@@ -41,8 +62,8 @@ def enter():
     p1_class = CHAR_CLASSES.get(p1_char_name, Byakuya)
     p2_class = CHAR_CLASSES.get(p2_char_name, Pain)
 
-    p1 = p1_class(player=1, x=900, y=50)
-    p2 = p2_class(player=2, x=300, y=50)
+    p1 = p1_class(player=1, x=300, y=50)
+    p2 = p2_class(player=2, x=900, y=50)
 
     p1.set_opponent(p2)
     p2.set_opponent(p1)
@@ -107,6 +128,15 @@ def update():
 def draw():
     clear_canvas()
     game_world.render()
+    
+    # Draw Player 1 icon (top-left)
+    if p1_character_icon_image:
+        p1_character_icon_image.draw(100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+
+    # Draw Player 2 icon (top-right)
+    if p2_character_icon_image:
+        p2_character_icon_image.draw(get_canvas_width() - 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+
     update_canvas()
 
 import lobby_mode
