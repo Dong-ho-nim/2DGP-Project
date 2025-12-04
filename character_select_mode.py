@@ -69,10 +69,10 @@ def enter():
 
     # Define the four selectable characters with their icon-to-portrait mapping
     character_data_map = {
-        'Byakuya': {'icon': 'Icon/images/1363.png', 'portrait': 'Icon/images/1304.png'},
-        'Naruto':  {'icon': 'Icon/images/1393.png', 'portrait': 'Icon/images/1286.png'},
-        'Sado':    {'icon': 'Icon/images/1395.png', 'portrait': 'Icon/images/1288.png'},
-        'Pain':    {'icon': 'Icon/images/1423.png', 'portrait': 'Icon/images/1328.png'}
+        'Byakuya': {'icon': 'Icon/images/Byakuya_Icon.png', 'portrait': 'Icon/images/Byakuya_Picture.png'},
+        'Naruto':  {'icon': 'Icon/images/Naruto_Icon.png', 'portrait': 'Icon/images/Naruto_Picture.png'},
+        'Sado':    {'icon': 'Icon/images/Sado_Icon.png', 'portrait': 'Icon/images/Sado_Picture.png'},
+        'Pain':    {'icon': 'Icon/images/Pain_Icon.png', 'portrait': 'Icon/images/Pain_Picture.png'}
     }
 
     # Create character objects
