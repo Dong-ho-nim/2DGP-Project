@@ -10,21 +10,20 @@ from BackGround import BackGround
 p1_char_name = None
 p2_char_name = None
 
-# Character icon clips within 1795.png (x, y, width, height)
-# Assuming 1795.png is a sprite sheet with 80x80 icons
-CHARACTER_ICON_CLIPS = {
-    'Pain': (0, 0, 80, 80), # Placeholder values, will need actual layout
-    'Naruto': (80, 0, 80, 80),
-    'Byakuya': (160, 0, 80, 80),
-    'Sado': (240, 0, 80, 80),
+# Character image file paths
+CHARACTER_ICONS = {
+    'Pain': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Pain.png',
+    'Naruto': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Naruto.png',
+    'Byakuya': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png',
+    'Sado': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Yasutora Sado.png',
 }
 
 p1 = None
 p2 = None
 
-character_selection_sheet = None # This will hold the loaded 1795.png
-p1_character_clip_info = None
-p2_character_clip_info = None
+character_selection_background_image = None # This will hold the loaded 1795.png
+p1_character_icon_image = None
+p2_character_icon_image = None
 
 
 def collide(bb1, bb2):
@@ -37,12 +36,12 @@ def collide(bb1, bb2):
     return True
 
 def enter():
-    global p1, p2, p1_char_name, p2_char_name, character_selection_sheet, p1_character_clip_info, p2_character_clip_info # Ensure globals are declared
+    global p1, p2, p1_char_name, p2_char_name, character_selection_background_image, p1_character_icon_image, p2_character_icon_image # Ensure globals are declared
     game_world.clear()
     game_world.add_object(BackGround(), 0)
 
-    # Load the character selection sprite sheet
-    character_selection_sheet = load_image('Icon/images/1795.png')
+    # Load the character selection background image (1795.png)
+    character_selection_background_image = load_image('Icon/images/1795.png')
 
     # Temporary hardcoding for p1_char_name and p2_char_name for testing
     # In a full game, these would be set by the character selection screen
@@ -51,9 +50,9 @@ def enter():
     if p2_char_name is None: # Only set if not already set by selection screen
         p2_char_name = 'Naruto'
     
-    # Get clipping information for selected characters
-    p1_character_clip_info = CHARACTER_ICON_CLIPS.get(p1_char_name)
-    p2_character_clip_info = CHARACTER_ICON_CLIPS.get(p2_char_name)
+    # Load character icon images based on selected characters
+    p1_character_icon_image = load_image(CHARACTER_ICONS.get(p1_char_name))
+    p2_character_icon_image = load_image(CHARACTER_ICONS.get(p2_char_name))
 
     CHAR_CLASSES = {
         'Naruto': Naruto,
@@ -134,15 +133,31 @@ def draw():
     clear_canvas()
     game_world.render()
     
-    # Draw Player 1 icon (top-left)
-    if character_selection_sheet and p1_character_clip_info:
-        x, y, w, h = p1_character_clip_info
-        character_selection_sheet.clip_draw(x, y, w, h, 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+    # Define positions for the background frames and character icons
+    frame_width, frame_height = 100, 100 # Size of the 1795.png frame
+    icon_width, icon_height = 70, 70 # Size of the character icon to fit inside the frame
+    
+    # Player 1 (top-left)
+    p1_frame_x, p1_frame_y = 100, get_canvas_height() - 50
+    p1_icon_x, p1_icon_y = p1_frame_x, p1_frame_y # Center icon within frame
 
-    # Draw Player 2 icon (top-right)
-    if character_selection_sheet and p2_character_clip_info:
-        x, y, w, h = p2_character_clip_info
-        character_selection_sheet.clip_draw(x, y, w, h, get_canvas_width() - 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+    # Player 2 (top-right)
+    p2_frame_x, p2_frame_y = get_canvas_width() - 100, get_canvas_height() - 50
+    p2_icon_x, p2_icon_y = p2_frame_x, p2_frame_y # Center icon within frame
+
+    # Draw Player 1 background frame (1795.png)
+    if character_selection_background_image:
+        character_selection_background_image.draw(p1_frame_x, p1_frame_y, frame_width, frame_height)
+    # Draw Player 1 actual character icon
+    if p1_character_icon_image:
+        p1_character_icon_image.draw(p1_icon_x, p1_icon_y, icon_width, icon_height)
+
+    # Draw Player 2 background frame (1795.png)
+    if character_selection_background_image:
+        character_selection_background_image.draw(p2_frame_x, p2_frame_y, frame_width, frame_height)
+    # Draw Player 2 actual character icon
+    if p2_character_icon_image:
+        p2_character_icon_image.draw(p2_icon_x, p2_icon_y, icon_width, icon_height)
 
     update_canvas()
 import lobby_mode
