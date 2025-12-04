@@ -12,10 +12,10 @@ p2_char_name = None
 
 # Character image file paths
 CHARACTER_ICONS = {
-    'Pain': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Pain.png',
-    'Naruto': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Naruto.png',
-    'Byakuya': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png',
-    'Sado': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Yasutora Sado.png',
+    'Pain': 'Icon/images/Pain_Icon.png',
+    'Naruto': 'Icon/images/Naruto_Icon.png',
+    'Byakuya': 'Icon/images/Byakuya_Icon.png',
+    'Sado': 'Icon/images/Sado_Icon.png',
 }
 
 p1 = None
@@ -40,8 +40,8 @@ def enter():
     game_world.clear()
     game_world.add_object(BackGround(), 0)
 
-    # Load the character selection background image (1795.png)
-    character_selection_background_image = load_image('Icon/images/1795.png')
+    # Load the character selection background image (Icon_Frame.png)
+    character_selection_background_image = load_image('Icon/images/Icon_Frame.png')
 
     # Temporary hardcoding for p1_char_name and p2_char_name for testing
     # In a full game, these would be set by the character selection screen
