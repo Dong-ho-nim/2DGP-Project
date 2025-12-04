@@ -10,19 +10,21 @@ from BackGround import BackGround
 p1_char_name = None
 p2_char_name = None
 
-# Character icon mapping
-CHARACTER_ICONS = {
-    'Pain': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Pain.png',
-    'Naruto': 'Icon/images/DS _ DSi - Naruto_ Shinobi Rumble - Fighters - Naruto.png',
-    'Byakuya': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Byakuya Kuchiki.png',
-    'Sado': 'Icon/images/DS _ DSi - Bleach_ Dark Souls - Characters - Yasutora Sado.png',
+# Character icon clips within 1795.png (x, y, width, height)
+# Assuming 1795.png is a sprite sheet with 80x80 icons
+CHARACTER_ICON_CLIPS = {
+    'Pain': (0, 0, 80, 80), # Placeholder values, will need actual layout
+    'Naruto': (80, 0, 80, 80),
+    'Byakuya': (160, 0, 80, 80),
+    'Sado': (240, 0, 80, 80),
 }
 
 p1 = None
 p2 = None
 
-p1_character_icon_image = None
-p2_character_icon_image = None
+character_selection_sheet = None # This will hold the loaded 1795.png
+p1_character_clip_info = None
+p2_character_clip_info = None
 
 
 def collide(bb1, bb2):
@@ -35,9 +37,12 @@ def collide(bb1, bb2):
     return True
 
 def enter():
-    global p1, p2, p1_char_name, p2_char_name, p1_character_icon_image, p2_character_icon_image # Ensure globals are declared
+    global p1, p2, p1_char_name, p2_char_name, character_selection_sheet, p1_character_clip_info, p2_character_clip_info # Ensure globals are declared
     game_world.clear()
     game_world.add_object(BackGround(), 0)
+
+    # Load the character selection sprite sheet
+    character_selection_sheet = load_image('Icon/images/1795.png')
 
     # Temporary hardcoding for p1_char_name and p2_char_name for testing
     # In a full game, these would be set by the character selection screen
@@ -46,9 +51,9 @@ def enter():
     if p2_char_name is None: # Only set if not already set by selection screen
         p2_char_name = 'Naruto'
     
-    # Load character icon images based on selected characters
-    p1_character_icon_image = load_image(CHARACTER_ICONS.get(p1_char_name))
-    p2_character_icon_image = load_image(CHARACTER_ICONS.get(p2_char_name))
+    # Get clipping information for selected characters
+    p1_character_clip_info = CHARACTER_ICON_CLIPS.get(p1_char_name)
+    p2_character_clip_info = CHARACTER_ICON_CLIPS.get(p2_char_name)
 
     CHAR_CLASSES = {
         'Naruto': Naruto,
@@ -130,13 +135,14 @@ def draw():
     game_world.render()
     
     # Draw Player 1 icon (top-left)
-    if p1_character_icon_image:
-        p1_character_icon_image.draw(100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+    if character_selection_sheet and p1_character_clip_info:
+        x, y, w, h = p1_character_clip_info
+        character_selection_sheet.clip_draw(x, y, w, h, 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
 
     # Draw Player 2 icon (top-right)
-    if p2_character_icon_image:
-        p2_character_icon_image.draw(get_canvas_width() - 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
+    if character_selection_sheet and p2_character_clip_info:
+        x, y, w, h = p2_character_clip_info
+        character_selection_sheet.clip_draw(x, y, w, h, get_canvas_width() - 100, get_canvas_height() - 50, 80, 80) # Adjust size as needed
 
     update_canvas()
-
 import lobby_mode
