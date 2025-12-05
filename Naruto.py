@@ -226,20 +226,15 @@ class Skill:
 
 
     def enter(self, e):
-
         self.frame = 0
-
         self.state = SKILL_STATE_1
-
         self.p.load_image('Naruto_Skill1.png')
-
         self.effect = None
-
         self.hit_on_first_frame = False
-
         self.scale_level = 0
-
         self.scale_timer = 0.0
+        self.is_paused_on_hit = False
+        self.timeout_sent = False
 
 
 
@@ -254,121 +249,80 @@ class Skill:
 
 
     def do(self):
-
         face_dir = self.p.face_dir
 
-
-
         if self.state == SKILL_STATE_1:
-
             prev_frame = int(self.frame)
-
             self.frame = (self.frame + 4 * game_framework.frame_time * 1.5) % 4
-
             current_frame_int = int(self.frame)
 
-
-
             if current_frame_int >= 1:
-
                 if self.effect is None:
-
                     offset_x = self.skill1_hand_offsets[current_frame_int][0] * face_dir
-
                     offset_y = self.skill1_hand_offsets[current_frame_int][1]
-
                     self.effect = SkillEffect(self.p.x + offset_x, self.p.y + offset_y, face_dir, 'Naruto_Skill_Effect1.png', 3, 33, 23)
-
                     game_world.add_object(self.effect, 1)
-
                 else:
-
                     offset_x = self.skill1_hand_offsets[current_frame_int][0] * face_dir
-
                     offset_y = self.skill1_hand_offsets[current_frame_int][1]
-
                     self.effect.x = self.p.x + offset_x
-
                     self.effect.y = self.p.y + offset_y
 
-
-
             if prev_frame == 3 and current_frame_int == 0:
-
                 self.state = SKILL_STATE_2
-
                 self.frame = 0
-
                 self.state_timer = 0.0
-
                 self.p.load_image('Naruto_Skill2.png')
 
-
-
                 if self.effect:
-
                     game_world.remove_object(self.effect)
 
-
-
                 offset_x_2 = self.skill2_hand_offsets[0][0] * face_dir
-
                 offset_y_2 = self.skill2_hand_offsets[0][1]
-
                 self.effect = SkillEffect(self.p.x + offset_x_2, self.p.y + offset_y_2, face_dir, 'Naruto_Skill_Effect2.png', 7, 102, 85)
-
                 game_world.add_object(self.effect, 1)
 
-
-
         elif self.state == SKILL_STATE_2:
-
             self.state_timer += game_framework.frame_time
+            if not self.is_paused_on_hit:
+                self.frame = (self.frame + 7 * game_framework.frame_time * 1.5)
 
-
-            # 첫 프레임 충돌 감지
             if self.frame < 1 and self.p.opponent:
                 attack_bb = self.p.get_attack_bb()
                 opponent_bb = self.p.opponent.get_bb()
                 if attack_bb and opponent_bb and collide(attack_bb, opponent_bb):
                     self.hit_on_first_frame = True
 
+            if self.hit_on_first_frame and self.frame >= 6:
+                self.is_paused_on_hit = True
 
-            # 히트 시 마지막 프레임에서 스케일링 처리 (부드럽게 보간)
-            if self.hit_on_first_frame and int(self.frame) == 6:
+            if self.is_paused_on_hit:
+                self.frame = 6 # 프레임 고정
                 self.scale_timer += game_framework.frame_time
-                # 단계별로 target_scale을 증가시키되, 즉시 점프 대신 set_target_scale로 부드럽게 변화
                 if self.scale_level == 0:
-                    if self.effect:
-                        self.effect.set_target_scale(1.35)
+                    if self.effect: self.effect.set_target_scale(1.35)
                     self.scale_level = 1
                 elif self.scale_level == 1 and self.scale_timer > 0.08:
-                    if self.effect:
-                        self.effect.set_target_scale(1.7)
+                    if self.effect: self.effect.set_target_scale(1.7)
                     self.scale_level = 2
                 elif self.scale_level == 2 and self.scale_timer > 0.18:
-                    if self.effect:
-                        self.effect.set_target_scale(2.2)
+                    if self.effect: self.effect.set_target_scale(2.2)
                     self.scale_level = 3
                 elif self.scale_level == 3 and self.scale_timer > 0.35:
-                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                    if not self.timeout_sent:
+                        self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                        self.timeout_sent = True
+            elif self.frame >= 7:
+                 if not self.timeout_sent:
+                        self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                        self.timeout_sent = True
 
-            else: # 히트 안했으면 그냥 시간 기반으로 종료
-
-                self.frame = (self.frame + 7 * game_framework.frame_time * 1.5) % 7
-                if self.state_timer > (1.0 / 1.5):
-                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
-
-
-            # 이펙트 위치 업데이트
-            current_frame_int = int(self.frame)
+            current_frame_int = int(self.frame) % 7
             offset_x = self.skill2_hand_offsets[current_frame_int][0] * face_dir
             offset_y = self.skill2_hand_offsets[current_frame_int][1]
             if self.effect:
                 self.effect.x = self.p.x + offset_x
                 self.effect.y = self.p.y + offset_y
-                # 프레임 변화에 따른 스케일 보정(효과 미세조정)
-                # (이미 set_target_scale로 제어되므로 별도 처리 불필요)
 
 
 
