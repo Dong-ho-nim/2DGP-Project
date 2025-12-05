@@ -279,7 +279,7 @@ class Skill:
 
                 offset_x_2 = self.skill2_hand_offsets[0][0] * face_dir
                 offset_y_2 = self.skill2_hand_offsets[0][1]
-                self.effect = SkillEffect(self.p.x + offset_x_2, self.p.y + offset_y_2, face_dir, 'Naruto_Skill_Effect2.png', 7, 102, 85)
+                self.effect = SkillEffect(self.p.x + offset_x_2, self.p.y + offset_y_2, face_dir, 'Naruto_Skill_Effect2.png', 3, 31, 30)
                 game_world.add_object(self.effect, 1)
 
         elif self.state == SKILL_STATE_2:
@@ -289,9 +289,24 @@ class Skill:
 
             if self.frame < 1 and self.p.opponent:
                 attack_bb = self.p.get_attack_bb()
-                opponent_bb = self.p.opponent.get_bb()
-                if attack_bb and opponent_bb and collide(attack_bb, opponent_bb):
-                    self.hit_on_first_frame = True
+                opponent_bb = None
+                if hasattr(self.p.opponent, 'get_bb'):
+                    opponent_bb = self.p.opponent.get_bb()
+
+                if attack_bb and opponent_bb:
+                    hit = False
+                    # get_attack_bb may return a list of bbs or a single bb
+                    if isinstance(attack_bb, list):
+                        for bb in attack_bb:
+                            if collide(bb, opponent_bb):
+                                hit = True
+                                break
+                    else:
+                        if collide(attack_bb, opponent_bb):
+                            hit = True
+
+                    if hit:
+                        self.hit_on_first_frame = True
 
             if self.hit_on_first_frame and self.frame >= 6:
                 self.is_paused_on_hit = True
@@ -300,13 +315,13 @@ class Skill:
                 self.frame = 6 # 프레임 고정
                 self.scale_timer += game_framework.frame_time
                 if self.scale_level == 0:
-                    if self.effect: self.effect.set_target_scale(1.35)
+                    if self.effect: self.effect.set_target_scale(8)
                     self.scale_level = 1
                 elif self.scale_level == 1 and self.scale_timer > 0.08:
-                    if self.effect: self.effect.set_target_scale(1.7)
+                    if self.effect: self.effect.set_target_scale(16)
                     self.scale_level = 2
                 elif self.scale_level == 2 and self.scale_timer > 0.18:
-                    if self.effect: self.effect.set_target_scale(2.2)
+                    if self.effect: self.effect.set_target_scale(16)
                     self.scale_level = 3
                 elif self.scale_level == 3 and self.scale_timer > 0.35:
                     if not self.timeout_sent:
