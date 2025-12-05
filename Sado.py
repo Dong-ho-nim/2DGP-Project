@@ -8,7 +8,7 @@ from key_input_table import KEY_MAP
 # 리소스 로드
 def load_resource(path):
     base_dir = os.path.dirname(__file__)
-    return load_image(os.path.join(base_dir, 'pain', path))
+    return load_image(os.path.join(base_dir, 'sado', path))
 
 # 이벤트 체크
 time_out = lambda e: e[0] == 'TIMEOUT'
@@ -68,7 +68,7 @@ class Effect:
 # === 상태 클래스들 ===
 class Idle:
     def __init__(self, p): self.p = p; self.frame = 0
-    def enter(self, e): self.p.load_image('Pain_Idle.png'); self.frame = 0
+    def enter(self, e): self.p.load_image('Sado_Idle.png'); self.frame = 0
     def exit(self, e): pass
     def do(self): self.frame = (self.frame + 8 * game_framework.frame_time * 1) % 8
     def draw(self):
@@ -81,7 +81,7 @@ class Idle:
 class Run:
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e):
-        self.p.load_image('Pain_Run.png')
+        self.p.load_image('Sado_Run.png')
         self.frame = 0
         if (self.p.player==1 and p1_right_down(e)) or (self.p.player==2 and p2_right_down(e)):
             self.p.dir = self.p.face_dir = 1
@@ -103,7 +103,7 @@ class Run:
 class Dash:
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.frame = 0
     def exit(self, e): pass
     def do(self):
@@ -125,7 +125,7 @@ class Attack:
         self.frame = 0
         self.effect = None
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.frame = 0
     def exit(self, e):
         self.effect = None
@@ -147,7 +147,7 @@ class PowerAttack:
         self.frame = 0
         self.effect = None
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.frame = 0
     def exit(self, e):
         self.effect = None
@@ -168,7 +168,7 @@ class Ultimate:
         self.p = p
         self.frame = 0
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.frame = 0
     def exit(self, e): pass
     def do(self):
@@ -189,7 +189,7 @@ class Skill:
         self.frame = 0
         self.effects = []
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.frame = 0
     def exit(self, e):
         self.effects.clear()
@@ -210,7 +210,7 @@ class Skill:
 class Jump:
     def __init__(self, p): self.p = p
     def enter(self, e):
-        self.p.load_image('Pain_Idle.png')
+        self.p.load_image('Sado_Idle.png')
         self.p.y_velocity = self.p.jump_speed
         self.p.jump_start_y = self.p.y
     def exit(self, e):
@@ -227,6 +227,32 @@ class Jump:
             self.p.image.clip_draw(0, 0, 61, 95, self.p.x, self.p.y + (95 / 2))
         else:
             self.p.image.clip_composite_draw(0, 0, 61, 95, 0, 'h', self.p.x, self.p.y + (95 / 2), 61, 95)
+
+class Hit:
+    def __init__(self, p):
+        self.p = p
+        self.duration = 0.5
+
+    def enter(self, e):
+        self.p.load_image('Sado_Hit.png')
+        self.duration = 0.5
+
+    def exit(self, e):
+        pass
+
+    def do(self):
+        self.duration -= game_framework.frame_time
+        if self.duration <= 0:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+    def draw(self):
+        # Guessing dimensions for Sado. Sado is a big guy.
+        width, height = 100, 120
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(0, 0, width, height, self.p.x, self.p.y + (height / 2))
+        else:
+            self.p.image.clip_composite_draw(0, 0, width, height, 0, 'h', self.p.x, self.p.y + (height / 2), width, height)
+
 
 class Sado:
     def __init__(self, player=1, x=200, y=250):
@@ -254,6 +280,7 @@ class Sado:
         self.ULTIMATE = Ultimate(self)
         self.SKILL = Skill(self)
         self.JUMP = Jump(self)
+        self.HIT = Hit(self)
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
                 lambda e: (self.player == 1 and (p1_left_down(e) or p1_right_down(e))) or
@@ -264,6 +291,7 @@ class Sado:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
                 lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
+                lambda e: e[0] == 'HIT': self.HIT,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -273,13 +301,15 @@ class Sado:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
                 lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
+                lambda e: e[0] == 'HIT': self.HIT,
             },
-            self.DASH: {time_out: self.IDLE},
-            self.ATTACK: {time_out: self.IDLE},
-            self.POWERATTACK: {time_out: self.IDLE},
-            self.JUMP: {time_out: self.IDLE},
-            self.SKILL: {time_out: self.IDLE},
-            self.ULTIMATE: {time_out: self.IDLE},
+            self.DASH: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.ATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.POWERATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.JUMP: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.SKILL: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.ULTIMATE: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.HIT: {time_out: self.IDLE},
         })
     def load_image(self, name):
         self.image = load_resource(name)
@@ -295,10 +325,14 @@ class Sado:
             self.health -= damage
             self.invincible = True
             self.hit_timer = 0.0
+            self.state_machine.handle_state_event(('HIT', None))
             print(f"Sado hit! Health: {self.health}")
             if self.health <= 0:
                 print("Sado is defeated!")
     def handle_event(self, event):
+        if self.state_machine.cur_state == self.HIT:
+            return
+            
         if event.type == SDL_KEYDOWN:
             self.pressed.add(event.key)
             key = event.key

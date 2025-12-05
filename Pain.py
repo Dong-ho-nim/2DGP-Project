@@ -497,6 +497,32 @@ class Skill:
         else:
             self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y + (85 / 2), 100, 85)
 
+class Hit:
+    def __init__(self, p):
+        self.p = p
+        self.duration = 0.5
+
+    def enter(self, e):
+        self.p.load_image('Pain_Hit.png')
+        self.duration = 0.5
+
+    def exit(self, e):
+        pass
+
+    def do(self):
+        self.duration -= game_framework.frame_time
+        if self.duration <= 0:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+    def draw(self):
+        # Assuming Pain_Hit.png is a single 90x90 image
+        width, height = 45, 80
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(0, 0, width, height, self.p.x, self.p.y + (height / 2))
+        else:
+            self.p.image.clip_composite_draw(0, 0, width, height, 0, 'h', self.p.x, self.p.y + (height / 2), width, height)
+
+
 # === 메인 클래스 Pain ===
 # python
 class Pain:
@@ -528,6 +554,7 @@ class Pain:
         self.POWERATTACK = PowerAttack(self)
         self.Ultimate = Ultimate(self)
         self.SKILL = Skill(self)  # Re-added Skill class instance
+        self.HIT = Hit(self)
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -539,6 +566,7 @@ class Pain:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'Ultimate': self.Ultimate,
                 lambda e: e[0] == 'SKILL': self.SKILL,  # Added SKILL transition
+                lambda e: e[0] == 'HIT': self.HIT,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -548,13 +576,15 @@ class Pain:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'Ultimate': self.Ultimate,
                 lambda e: e[0] == 'SKILL': self.SKILL,  # Added SKILL transition
+                lambda e: e[0] == 'HIT': self.HIT,
             },
-            self.JUMP: {time_out: self.IDLE},
-            self.PUNCH: {time_out: self.IDLE},
-            self.DASH: {time_out: self.IDLE},
-            self.POWERATTACK: {time_out: self.IDLE},
-            self.Ultimate: {time_out: self.IDLE},
-            self.SKILL: {time_out: self.IDLE},  # Added SKILL timeout transition
+            self.JUMP: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.PUNCH: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.DASH: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.POWERATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.Ultimate: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.SKILL: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},  # Added SKILL timeout transition
+            self.HIT: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
@@ -581,12 +611,16 @@ class Pain:
             self.health -= damage
             self.invincible = True
             self.hit_timer = 0.0 # Reset timer
+            self.state_machine.handle_state_event(('HIT', None))
             print(f"Pain hit! Health: {self.health}")
             if self.health <= 0:
                 print("Pain is defeated!")
                 # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
+        if self.state_machine.cur_state == self.HIT:
+            return
+
         # KEYDOWN/KEYUP로 self.pressed를 업데이트해서 동시입력을 안정적으로 감지
         if event.type == SDL_KEYDOWN:
             self.pressed.add(event.key)

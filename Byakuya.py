@@ -344,6 +344,31 @@ class Jump:
             self.p.image.clip_composite_draw(0, 0, 61, 95, 0, 'h', self.p.x, self.p.y + (95 / 2), 61, 95)
 
 
+class Hit:
+    def __init__(self, p):
+        self.p = p
+        self.duration = 0.5
+
+    def enter(self, e):
+        self.p.load_image('Byakuya_Hit.png')
+        self.duration = 0.5
+
+    def exit(self, e):
+        pass
+
+    def do(self):
+        self.duration -= game_framework.frame_time
+        if self.duration <= 0:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+    def draw(self):
+        # Assuming Byakuya_Hit.png is a single 80x100 image
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(0, 0, 65, 100, self.p.x, self.p.y + (100 / 2))
+        else:
+            self.p.image.clip_composite_draw(0, 0, 65, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 65, 100)
+
+
 # === 메인 클래스 Byakuya ===
 class Byakuya:
     def __init__(self, player=1, x=200, y=250):
@@ -374,6 +399,7 @@ class Byakuya:
         self.ULTIMATE = Ultimate(self) # ULTIMATE 상태 초기화 (정의 순서에 맞춰 이동)
         self.SKILL = Skill(self) # SKILL 상태 초기화 (정의 순서에 맞춰 이동)
         self.JUMP = Jump(self) # JUMP 상태 초기화 (정의 순서에 맞춰 이동)
+        self.HIT = Hit(self)
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -385,6 +411,7 @@ class Byakuya:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
                 lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'HIT': self.HIT,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -394,13 +421,15 @@ class Byakuya:
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
                 lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'HIT': self.HIT,
             },
-            self.DASH: {time_out: self.IDLE},
-            self.ATTACK: {time_out: self.IDLE},
-            self.POWERATTACK: {time_out: self.IDLE},
-            self.JUMP: {time_out: self.IDLE},
-            self.SKILL: {time_out: self.IDLE},
-            self.ULTIMATE: {time_out: self.IDLE}, # ULTIMATE 상태 정의 추가
+            self.DASH: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.ATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.POWERATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.JUMP: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.SKILL: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
+            self.ULTIMATE: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT}, # ULTIMATE 상태 정의 추가
+            self.HIT: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
@@ -423,12 +452,16 @@ class Byakuya:
             self.health -= damage
             self.invincible = True
             self.hit_timer = 0.0 # Reset timer
+            self.state_machine.handle_state_event(('HIT', None))
             print(f"Byakuya hit! Health: {self.health}")
             if self.health <= 0:
                 print("Byakuya is defeated!")
                 # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
+        if self.state_machine.cur_state == self.HIT:
+            return
+
         if event.type == SDL_KEYDOWN:
             self.pressed.add(event.key)
             key = event.key
