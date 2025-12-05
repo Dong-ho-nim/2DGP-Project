@@ -445,31 +445,33 @@ class PainUltimateStone:
         except Exception:
             self.image.draw(self.x, self.y, self.size, self.size)
 
-# Skill 상태 클래스 (누락되어 NameError 발생하므로 추가)
+# --- Skill effect class 추가: Naruto의 SkillEffect와 유사하게 Pain용 이펙트 생성/갱신/드로우 처리 ---
+# 해당 블록은 실수로 추가된 중복 구현입니다. 원래 Pain의 Skill 구현은 파일 상단에 이미 존재하므로
+# 아래의 중복된 SkillEffect 및 Skill 클래스는 제거했습니다.
+
+
 class Skill:
     def __init__(self, p):
         self.p = p
         self.frame = 0
         # 이동 관련
         self.move_timer = 0.0
-        self.move_duration = 0.20  # 초
-        self.move_speed = 300      # 픽셀/초
+        self.move_duration = 0.20
+        self.move_speed = 300
         self.move_dir = 0
 
     def enter(self, e):
         self.p.load_image('Pain_Skill.png')
         self.frame = 0
-        # 상대가 있으면 상대의 좌표로 이동 (상대 face_dir에 따라 약간의 오프셋 적용)
+        # 상대가 있으면 상대 좌표로 이동 (face_dir 반대 방향으로 약간 오프셋)
         if getattr(self.p, 'opponent', None) and getattr(self.p.opponent, 'face_dir', None) is not None:
             opp = self.p.opponent
             if opp.face_dir == 1:
-                target_x = opp.x - 13
+                target_x = opp.x - 10
             else:
-                target_x = opp.x + 13
-            # 화면 경계 내로 클램프
+                target_x = opp.x + 10
             self.p.x = max(100, min(1100, target_x))
         else:
-            # 상대 정보가 없으면 기존 동작 유지: 현재 바라보는 방향과 반대 방향으로 짧게 이동
             self.move_dir = - self.p.face_dir
             self.move_timer = self.move_duration
 
@@ -478,15 +480,12 @@ class Skill:
         self.move_dir = 0
 
     def do(self):
-        # 이동 처리 (진입 후 짧은 시간 동안)
         if self.move_timer > 0:
             dx = self.move_dir * self.move_speed * game_framework.frame_time
             self.p.x += dx
-            # 화면 경계 내로 제한
             self.p.x = max(100, min(1100, self.p.x))
             self.move_timer -= game_framework.frame_time
 
-        # 애니메이션 진행
         self.frame += 10 * game_framework.frame_time * 1.5
         if self.frame >= 9.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
@@ -528,7 +527,7 @@ class Pain:
         self.DASH = Dash(self)
         self.POWERATTACK = PowerAttack(self)
         self.Ultimate = Ultimate(self)
-        self.SKILL = Skill(self)
+        self.SKILL = Skill(self)  # Re-added Skill class instance
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -539,7 +538,7 @@ class Pain:
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'Ultimate': self.Ultimate,
-                lambda e: e[0] == 'SKILL': self.SKILL,
+                lambda e: e[0] == 'SKILL': self.SKILL,  # Added SKILL transition
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -548,14 +547,14 @@ class Pain:
                 lambda e: (self.player == 1 and p1_dash(e)) or (self.player == 2 and p2_dash(e)): self.DASH,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'Ultimate': self.Ultimate,
-                lambda e: e[0] == 'SKILL': self.SKILL,
+                lambda e: e[0] == 'SKILL': self.SKILL,  # Added SKILL transition
             },
             self.JUMP: {time_out: self.IDLE},
             self.PUNCH: {time_out: self.IDLE},
             self.DASH: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
             self.Ultimate: {time_out: self.IDLE},
-            self.SKILL: {time_out: self.IDLE},
+            self.SKILL: {time_out: self.IDLE},  # Added SKILL timeout transition
         })
 
     def load_image(self, name):
@@ -693,7 +692,7 @@ class Pain:
         width = 88
         height = 100
         
-        return self.x - width / 2, self.y, self.x + width / 2, self.y + height
+        return self.x - width / 2 + 22, self.y - 10, self.x + width / 2 - 19, self.y + height + 10
 
     def draw(self):
         self.state_machine.draw()

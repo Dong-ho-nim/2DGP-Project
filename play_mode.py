@@ -1,6 +1,8 @@
 from pico2d import *
+from typing import Optional, Any
 import game_framework
 import game_world
+import lobby_mode
 from Pain import Pain
 from Byakuya import Byakuya
 from Naruto import Naruto
@@ -18,12 +20,18 @@ CHARACTER_ICONS = {
     'Sado': 'Icon/images/Sado_Icon.png',
 }
 
-p1 = None
-p2 = None
+p1: Optional[Pain] = None
+p2: Optional[Pain] = None
 
-character_selection_background_image = None # This will hold the loaded 1795.png
-p1_character_icon_image = None
-p2_character_icon_image = None
+character_selection_background_image: Optional[Any] = None # This will hold the loaded 1795.png
+p1_character_icon_image: Optional[Any] = None
+p2_character_icon_image: Optional[Any] = None
+
+# HUD 리소스
+hp_frame_image: Optional[Any] = None
+hp_fill_image: Optional[Any] = None
+time_image: Optional[Any] = None
+round_time: float = 0.0
 
 
 def collide(bb1, bb2):
@@ -37,6 +45,7 @@ def collide(bb1, bb2):
 
 def enter():
     global p1, p2, p1_char_name, p2_char_name, character_selection_background_image, p1_character_icon_image, p2_character_icon_image # Ensure globals are declared
+    global hp_frame_image, hp_fill_image, time_image, round_time
     game_world.clear()
     game_world.add_object(BackGround(), 0)
 
@@ -53,6 +62,16 @@ def enter():
     # Load character icon images based on selected characters
     p1_character_icon_image = load_image(CHARACTER_ICONS.get(p1_char_name))
     p2_character_icon_image = load_image(CHARACTER_ICONS.get(p2_char_name))
+
+    # HUD 리소스 로드
+    try:
+        hp_frame_image = load_image('Icon/images/HP_Frame.png')
+        hp_fill_image = load_image('Icon/images/HP.png')
+        time_image = load_image('Icon/images/Time.png')
+    except Exception:
+        hp_frame_image = hp_fill_image = time_image = None
+
+    round_time = 99.0
 
     CHAR_CLASSES = {
         'Naruto': Naruto,
@@ -91,13 +110,21 @@ def handle_events(event):
 
 def update():
     game_world.update()
+    # 라운드 타이머 감소
+    global round_time
+    try:
+        round_time -= game_framework.frame_time
+    except Exception:
+        round_time = round_time
+    if round_time < 0:
+        round_time = 0
 
     # --- Attack Collision Detection ---
     # Check p1's attack against p2's body
     p1_attack_bb = p1.get_attack_bb()
     if p1_attack_bb:
         p2_body_bb = p2.get_bb()
-        
+
         # Handle cases where attack_bb can be a list (e.g., skill)
         if isinstance(p1_attack_bb, list):
             for bb in p1_attack_bb:
@@ -114,7 +141,7 @@ def update():
     p2_attack_bb = p2.get_attack_bb()
     if p2_attack_bb:
         p1_body_bb = p1.get_bb()
-        
+
         # Handle cases where attack_bb can be a list (e.g., skill)
         if isinstance(p2_attack_bb, list):
             for bb in p2_attack_bb:
@@ -134,8 +161,8 @@ def draw():
     game_world.render()
     
     # Define positions for the background frames and character icons
-    frame_width, frame_height = 100, 100 # Size of the 1795.png frame
-    icon_width, icon_height = 70, 70 # Size of the character icon to fit inside the frame
+    frame_width, frame_height = 100, 100 # Size of the Icon_Frame.png frame
+    icon_width, icon_height = 60, 60 # Size of the character icon to fit inside the frame
     
     # Player 1 (top-left)
     p1_frame_x, p1_frame_y = 100, get_canvas_height() - 50
@@ -159,5 +186,46 @@ def draw():
     if p2_character_icon_image:
         p2_character_icon_image.draw(p2_icon_x, p2_icon_y, icon_width, icon_height)
 
+    # --- HUD: HP bar 및 Time ---
+    # HP 바 크기 및 위치
+    hp_w, hp_h = 200, 28
+    hp_offset_y = 40
+
+    # P1 HP (왼쪽)
+    if hp_frame_image:
+        hp_frame_image.draw(p1_frame_x, p1_frame_y - hp_offset_y, hp_w, hp_h)
+    if hp_fill_image and p1:
+        hp_percent = max(0.0, min(1.0, getattr(p1, 'health', 100) / 100.0))
+        fill_w = int(hp_w * hp_percent)
+        if fill_w > 0:
+            fill_x = p1_frame_x - (hp_w / 2) + (fill_w / 2)
+            hp_fill_image.draw(fill_x, p1_frame_y - hp_offset_y, fill_w, hp_h)
+
+    # P2 HP (오른쪽)
+    if hp_frame_image:
+        hp_frame_image.draw(p2_frame_x, p2_frame_y - hp_offset_y, hp_w, hp_h)
+    if hp_fill_image and p2:
+        hp_percent = max(0.0, min(1.0, getattr(p2, 'health', 100) / 100.0))
+        fill_w = int(hp_w * hp_percent)
+        if fill_w > 0:
+            # 오른쪽에서 왼쪽으로 채울 경우도 동일한 중앙 기준으로 계산
+            fill_x = p2_frame_x - (hp_w / 2) + (fill_w / 2)
+            hp_fill_image.draw(fill_x, p2_frame_y - hp_offset_y, fill_w, hp_h)
+
+    # Time 이미지 및 숫자 표시 (중앙 상단)
+    if time_image:
+        time_image.draw(get_canvas_width() // 2, get_canvas_height() - 50)
+
+    # 남은 시간 숫자 표시
+    if round_time >= 0:
+        try:
+            draw_font = load_font('ENCR10B.TTF', 24)
+            time_text = f'Time: {int(round_time)}'
+            text_width, text_height = draw_font.get_size(time_text)
+            draw_font.draw(get_canvas_width() // 2 - text_width // 2, get_canvas_height() - 80, time_text)
+        except Exception:
+            # Font file missing or load failed -> skip drawing numeric time
+            pass
+
     update_canvas()
-import lobby_mode
+    import lobby_mode
