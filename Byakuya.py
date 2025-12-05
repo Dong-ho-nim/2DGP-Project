@@ -360,6 +360,7 @@ class Byakuya:
         self.gravity = 1500 # 중력 가속도
         self.y_velocity = 0 # y축 속도
         self.jump_start_y = self.y # 점프 시작 높이 (지면 높이)
+        self.body_height = 100 # 캐릭터 높이 추가
 
         self.health = 100 # 체력
         self.invincible = False # 무적 상태

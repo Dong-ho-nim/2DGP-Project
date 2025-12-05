@@ -4,11 +4,12 @@ import game_framework
 import os
 from state_machine import StateMachine
 from key_input_table import KEY_MAP
+import game_world
 
 # 리소스 로드
 def load_resource(path):
     base_dir = os.path.dirname(__file__)
-    return load_image(os.path.join(base_dir, 'byakuya', path))
+    return load_image(os.path.join(base_dir, 'Naruto', path))
 
 # 이벤트 체크
 time_out = lambda e: e[0] == 'TIMEOUT'
@@ -46,17 +47,15 @@ class Effect:
         self.frame_w = frame_w
         self.frame_h = frame_h
         self.speed = 1.5
-        self.direction = direction # 이펙트의 이동 방향 (x축)
-        self.move_speed = move_speed # 이펙트의 x축 이동 속도
+        self.direction = direction
+        self.move_speed = move_speed
 
     def update(self):
-        effect_speed_factor = 1.0 # Default speed for effect
-        # Check if we are in the last 2 frames
+        effect_speed_factor = 1.0
         if int(self.frame) >= self.frame_count - 2:
-            effect_speed_factor = 0.5 # Slow down speed
-
+            effect_speed_factor = 0.5
         self.frame = (self.frame + self.frame_count * game_framework.frame_time * self.speed * effect_speed_factor) % self.frame_count
-        if self.direction != 0: # 방향이 설정되어 있을 경우에만 x축 이동
+        if self.direction != 0:
             self.x += self.direction * self.move_speed * game_framework.frame_time
 
     def draw(self, face_dir):
@@ -66,24 +65,59 @@ class Effect:
         else:
             self.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h', self.x, self.y, self.frame_w, self.frame_h)
 
+class SkillEffect:
+    def __init__(self, x, y, face_dir, image_name, frame_count, frame_w, frame_h):
+        self.x, self.y = x, y
+        self.face_dir = face_dir
+        self.image = load_resource(image_name)
+        self.frame_count = frame_count
+        self.frame_w = frame_w
+        self.frame_h = frame_h
+        self.frame = 0
+        self.scale = 1.0
+        # 부드러운 스케일링을 위한 타깃값과 속도
+        self.target_scale = 1.0
+        self.scale_speed = 6.0  # 클수록 더 빠르게 목표 스케일로 도달
+
+    def update(self):
+        # 프레임 애니메이션
+        self.frame = (self.frame + self.frame_count * game_framework.frame_time * 2.0) % self.frame_count
+        # 스케일 보간 (부드럽게 증감)
+        if abs(self.scale - self.target_scale) > 1e-3:
+            diff = self.target_scale - self.scale
+            step = diff * min(1.0, self.scale_speed * game_framework.frame_time)
+            self.scale += step
+
+    def set_target_scale(self, s):
+        self.target_scale = s
+
+    def draw(self):
+        sx = int(self.frame) * self.frame_w
+        width = self.frame_w * self.scale
+        height = self.frame_h * self.scale
+        # 이미지 중심 기준으로 그리기 유지
+        if self.face_dir == 1:
+            self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y, width, height)
+        else:
+            self.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h', self.x, self.y, width, height)
 
 # === 상태 클래스들 ===
 class Idle:
     def __init__(self, p): self.p = p; self.frame = 0
-    def enter(self, e): self.p.load_image('Byakuya_Idle.png'); self.frame = 0
+    def enter(self, e): self.p.load_image('Naruto_Idle.png'); self.frame = 0
     def exit(self, e): pass
-    def do(self): self.frame = (self.frame + 8 * game_framework.frame_time * 1) % 8
+    def do(self): self.frame = (self.frame + 4 * game_framework.frame_time * 1) % 4
     def draw(self):
-        sx = int(self.frame) * 66
+        sx = int(self.frame) * 88
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 66, 100, self.p.x, self.p.y + (100 / 2))
+            self.p.image.clip_draw(sx, 0, 88, 65, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 66, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 66, 100)
+            self.p.image.clip_composite_draw(sx, 0, 88, 65, 0, 'h', self.p.x, self.p.y + (100 / 2), 88, 65)
 
 class Run:
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e):
-        self.p.load_image('Byakuya_Run.png')
+        self.p.load_image('Naruto_Run.png')
         self.frame = 0
         if (self.p.player==1 and p1_right_down(e)) or (self.p.player==2 and p2_right_down(e)):
             self.p.dir = self.p.face_dir = 1
@@ -91,21 +125,21 @@ class Run:
             self.p.dir = self.p.face_dir = -1
     def exit(self, e): self.p.dir = 0
     def do(self):
-        self.frame = (self.frame + 4 * game_framework.frame_time * 6) % 4
+        self.frame = (self.frame + 6 * game_framework.frame_time * 2.5) % 6
         self.p.x += self.p.dir * 400 * game_framework.frame_time
         self.p.x = max(100, min(1100, self.p.x))
         self.p.face_dir = self.p.dir
     def draw(self):
-        sx = int(self.frame) * 71
+        sx = int(self.frame) * 84
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 71, 100, self.p.x, self.p.y + (100 / 2))
+            self.p.image.clip_draw(sx, 0, 84, 60, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 71, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 71, 100)
+            self.p.image.clip_composite_draw(sx, 0, 84, 60, 0, 'h', self.p.x, self.p.y + (100 / 2), 84, 60)
 
 class Dash:
     def __init__(self, p): self.p = p; self.frame = 0
     def enter(self, e):
-        self.p.load_image('Byakuya_Dash.png')
+        self.p.load_image('Naruto_Dash.png')
         self.frame = 0
     def exit(self, e): pass
     def do(self):
@@ -115,233 +149,291 @@ class Dash:
         if self.frame >= 1.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
     def draw(self):
-        sx = int(self.frame) * 111
+        sx = int(self.frame) * 78
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 111, 100, self.p.x, self.p.y + (100 / 2))
+            self.p.image.clip_draw(sx, 0, 78, 62, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 111, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 111, 100)
+            self.p.image.clip_composite_draw(sx, 0, 78, 62, 0, 'h', self.p.x, self.p.y + (100 / 2), 78, 62)
 
 class Attack:
     def __init__(self, p):
         self.p = p
         self.frame = 0
-        self.effect = None
-
     def enter(self, e):
-        self.p.load_image('Byakuya_Attack.png')
+        self.p.load_image('Naruto_Attack.png')
         self.frame = 0
-        # 이펙트 생성 (5 프레임) - y 좌표 보정 적용
-        self.effect = Effect(self.p.x, self.p.y + (100 / 2), 'Byakuya_Attack_Effect.png', 5, 135, 100)
-
-    def exit(self, e):
-        self.effect = None # 이펙트 소멸
-
+    def exit(self, e): pass
     def do(self):
-        # 캐릭터 애니메이션은 8프레임으로 진행
         self.frame += 8 * game_framework.frame_time * 1.5
         if self.frame >= 7.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
-
     def draw(self):
-        char_frame_index = int(self.frame)
-
-        # 1. 캐릭터 그리기 (8 프레임) - y 좌표 보정 적용
-        sx = char_frame_index * 130
+        sx = int(self.frame) * 103
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 130, 100, self.p.x, self.p.y + (100 / 2))
+            self.p.image.clip_draw(sx, 0, 103, 65, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 130, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 130, 100)
+            self.p.image.clip_composite_draw(sx, 0, 103, 65, 0, 'h', self.p.x, self.p.y + (100 / 2), 103, 65)
 
-        # 2. 이펙트 그리기 (캐릭터 프레임 1~5일 때만)
-        if self.effect and 1 <= char_frame_index <= 5:
-            # 이펙트 프레임을 캐릭터 프레임에 동기화
-            effect_display_index = char_frame_index - 1
-            
-            # 위치를 캐릭터와 동일하게 설정 - Effect 객체 생성 시 이미 보정되었으므로 여기서는 변경하지 않음
-            # self.effect.x, self.effect.y = self.p.x, self.p.y
-            
-            # 프레임 설정 및 그리기
-            self.effect.frame = effect_display_index
-            self.effect.draw(self.p.face_dir)
 class PowerAttack:
     def __init__(self, p):
         self.p = p
         self.frame = 0
-        self.effect = None
-
     def enter(self, e):
-        self.p.load_image('Byakuya_PowerAttack.png')
+        self.p.load_image('Naruto_PowerAttack.png')
         self.frame = 0
-        # 이펙트 생성 - y 좌표 보정 적용
-        self.effect = Effect(self.p.x, self.p.y + (100 / 2), 'Byakuya_PowerAttack_Effect.png', 5, 165, 100)
-
-    def exit(self, e):
-        self.effect = None
-
+    def exit(self, e): pass
     def do(self):
         self.frame += 5 * game_framework.frame_time * 1.5
         if self.frame >= 4.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
-
     def draw(self):
-        char_frame_index = int(self.frame)
-
-        sx = char_frame_index * 165
+        sx = int(self.frame) * 97
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 165, 100, self.p.x, self.p.y + (100 / 2))
+            self.p.image.clip_draw(sx, 0, 97, 67, self.p.x, self.p.y + (100 / 2))
         else:
-            self.p.image.clip_composite_draw(sx, 0, 165, 100, 0, 'h', self.p.x, self.p.y + (100 / 2), 165, 100)
+            self.p.image.clip_composite_draw(sx, 0, 97, 67, 0, 'h', self.p.x, self.p.y + (100 / 2), 97, 67)
 
-        if self.effect and 1 <= char_frame_index <= 4:
-            effect_display_index = char_frame_index - 1
-            # Effect 객체 생성 시 이미 보정되었으므로 여기서는 변경하지 않음
-            # self.effect.x, self.effect.y = self.p.x, self.p.y
-            self.effect.frame = effect_display_index
-            self.effect.draw(self.p.face_dir)
-
-class Ultimate:
-    Y_OFFSET = -205 # 시각적 조정을 위한 Y 오프셋 (510 높이의 중심을 100 높이의 캐릭터 중심에 맞추기 위해)
-
-    def __init__(self, p):
-        self.p = p
-        self.frame = 0
-        self.effect = None # 이펙트 추가
-        self.hit_landed = False
-        self.hit_checked = False
-
-    def enter(self, e):
-        self.p.load_image('Byakuya_Ultimate.png')
-        self.frame = 0
-        self.hit_landed = False
-        self.hit_checked = False
-        # Ultimate 이펙트 생성 (7 프레임, 250x250 가정)
-        # 이펙트 y 위치는 캐릭터의 기본 y + (캐릭터 높이/2)에 얼라인
-        self.effect = Effect(self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20, 'Byakuya_Ultimate_Effect.png', 12, 243, 180)
-
-
-    def exit(self, e):
-        self.effect = None # 이펙트 소멸
-
-    def do(self):
-        # Only check for hit once on the first active frame
-        if not self.hit_checked and int(self.frame) >= 1:
-            self.hit_checked = True
-            attack_bb = self.p.get_attack_bb()
-            if attack_bb:
-                opponent_bb = self.p.opponent.get_bb()
-                if opponent_bb and collide(attack_bb, opponent_bb):
-                    self.hit_landed = True
-
-        # Determine animation speed
-        animation_speed_factor = 1.0  # Default speed
-        
-        # If the attack landed and we are in the last 4 frames, slow down
-        if self.hit_landed and int(self.frame) >= 10:
-            animation_speed_factor = 0.1
-
-        self.frame += 14 * game_framework.frame_time * animation_speed_factor
-        if self.frame >= 13.9: # 프레임 수에 맞춰 조건 변경 (0-13)
-            self.p.state_machine.handle_state_event(('TIMEOUT', None))
-        
-        if self.effect: # 이펙트 업데이트
-            self.effect.update()
-
-    def draw(self):
-        char_frame_index = int(self.frame)
-
-        # Byakuya_Ultimate.png의 프레임 크기: 너비 274, 높이 510
-        # y 좌표는 다른 캐릭터 애니메이션과 동일하게 (높이 / 2) 보정 적용 후 Y_OFFSET 추가
-        sx = char_frame_index * 266 # 프레임 너비 274로 변경
-        draw_y = self.p.y + (510 / 2) + Ultimate.Y_OFFSET # Y_OFFSET 적용
-        if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 266, 510, self.p.x, draw_y) # 너비 274, 높이 510으로 변경
-        else:
-            self.p.image.clip_composite_draw(sx, 0, 266, 510, 0, 'h', self.p.x, draw_y, 266, 510) # 너비 274, 높이 510으로 변경
-
-        if self.effect and 1 <= char_frame_index <= 12:
-            effect_display_index = char_frame_index - 1
-            self.effect.frame = effect_display_index
-            self.effect.draw(self.p.face_dir)
-
+# Naruto Skill 상태 상수
+SKILL_STATE_1 = 0
+SKILL_STATE_2 = 1
 
 class Skill:
+
     def __init__(self, p):
+
         self.p = p
+
         self.frame = 0
-        self.effects = [] # 이펙트를 리스트로 관리
+
+        self.state = SKILL_STATE_1
+
+        self.effect = None
+
+        self.state_timer = 0.0
+
+        self.hit_on_first_frame = False
+
+        self.scale_timer = 0.0
+
+        self.scale_level = 0
+
+        # 프레임별 손의 상대 위치 (x, y) 오프셋
+
+        self.skill1_hand_offsets = [(30, 30), (32, 35), (35, 30), (33, 28)]
+
+        self.skill2_hand_offsets = [(40, 40), (42, 45), (45, 40), (43, 38), (40, 42), (42, 45), (45, 40)]
+
+
 
     def enter(self, e):
-        self.p.load_image('Byakuya_Skill.png')
+
         self.frame = 0
-        # 상대방 중심에서 x축으로 퍼져나가는 이펙트 생성
-        if self.p.opponent:
-            # 왼쪽으로 퍼지는 이펙트 - 상대방 y 좌표 보정 적용 (평균 높이 100 가정)
-            effect_left = Effect(self.p.opponent.x, self.p.opponent.y + (100 / 2), 'Byakuya_Skill_Effect.png', 5, 88, 8, direction=-1, move_speed=200)
-            self.effects.append(effect_left)
-            # 오른쪽으로 퍼지는 이펙트 - 상대방 y 좌표 보정 적용 (평균 높이 100 가정)
-            effect_right = Effect(self.p.opponent.x, self.p.opponent.y + (100 / 2), 'Byakuya_Skill_Effect.png', 5, 88, 8, direction=1, move_speed=200)
-            self.effects.append(effect_right)
+
+        self.state = SKILL_STATE_1
+
+        self.p.load_image('Naruto_Skill1.png')
+
+        self.effect = None
+
+        self.hit_on_first_frame = False
+
+        self.scale_level = 0
+
+        self.scale_timer = 0.0
+
 
 
     def exit(self, e):
-        self.effects.clear() # 이펙트 소멸
+
+        if self.effect:
+
+            game_world.remove_object(self.effect)
+
+        self.effect = None
+
+
 
     def do(self):
-        # Byakuya_Skill.png의 애니메이션 프레임은 10프레임으로 가정
-        self.frame += 10 * game_framework.frame_time * 1.2
-        if self.frame >= 9.9:
-            self.p.state_machine.handle_state_event(('TIMEOUT', None))
-        
-        # 모든 이펙트 업데이트
-        for effect in self.effects:
-            effect.update()
+
+        face_dir = self.p.face_dir
+
+
+
+        if self.state == SKILL_STATE_1:
+
+            prev_frame = int(self.frame)
+
+            self.frame = (self.frame + 4 * game_framework.frame_time * 1.5) % 4
+
+            current_frame_int = int(self.frame)
+
+
+
+            if current_frame_int >= 1:
+
+                if self.effect is None:
+
+                    offset_x = self.skill1_hand_offsets[current_frame_int][0] * face_dir
+
+                    offset_y = self.skill1_hand_offsets[current_frame_int][1]
+
+                    self.effect = SkillEffect(self.p.x + offset_x, self.p.y + offset_y, face_dir, 'Naruto_Skill_Effect1.png', 3, 33, 23)
+
+                    game_world.add_object(self.effect, 1)
+
+                else:
+
+                    offset_x = self.skill1_hand_offsets[current_frame_int][0] * face_dir
+
+                    offset_y = self.skill1_hand_offsets[current_frame_int][1]
+
+                    self.effect.x = self.p.x + offset_x
+
+                    self.effect.y = self.p.y + offset_y
+
+
+
+            if prev_frame == 3 and current_frame_int == 0:
+
+                self.state = SKILL_STATE_2
+
+                self.frame = 0
+
+                self.state_timer = 0.0
+
+                self.p.load_image('Naruto_Skill2.png')
+
+
+
+                if self.effect:
+
+                    game_world.remove_object(self.effect)
+
+
+
+                offset_x_2 = self.skill2_hand_offsets[0][0] * face_dir
+
+                offset_y_2 = self.skill2_hand_offsets[0][1]
+
+                self.effect = SkillEffect(self.p.x + offset_x_2, self.p.y + offset_y_2, face_dir, 'Naruto_Skill_Effect2.png', 7, 102, 85)
+
+                game_world.add_object(self.effect, 1)
+
+
+
+        elif self.state == SKILL_STATE_2:
+
+            self.state_timer += game_framework.frame_time
+
+
+            # 첫 프레임 충돌 감지
+            if self.frame < 1 and self.p.opponent:
+                attack_bb = self.p.get_attack_bb()
+                opponent_bb = self.p.opponent.get_bb()
+                if attack_bb and opponent_bb and collide(attack_bb, opponent_bb):
+                    self.hit_on_first_frame = True
+
+
+            # 히트 시 마지막 프레임에서 스케일링 처리 (부드럽게 보간)
+            if self.hit_on_first_frame and int(self.frame) == 6:
+                self.scale_timer += game_framework.frame_time
+                # 단계별로 target_scale을 증가시키되, 즉시 점프 대신 set_target_scale로 부드럽게 변화
+                if self.scale_level == 0:
+                    if self.effect:
+                        self.effect.set_target_scale(1.35)
+                    self.scale_level = 1
+                elif self.scale_level == 1 and self.scale_timer > 0.08:
+                    if self.effect:
+                        self.effect.set_target_scale(1.7)
+                    self.scale_level = 2
+                elif self.scale_level == 2 and self.scale_timer > 0.18:
+                    if self.effect:
+                        self.effect.set_target_scale(2.2)
+                    self.scale_level = 3
+                elif self.scale_level == 3 and self.scale_timer > 0.35:
+                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+            else: # 히트 안했으면 그냥 시간 기반으로 종료
+
+                self.frame = (self.frame + 7 * game_framework.frame_time * 1.5) % 7
+                if self.state_timer > (1.0 / 1.5):
+                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
+
+
+            # 이펙트 위치 업데이트
+            current_frame_int = int(self.frame)
+            offset_x = self.skill2_hand_offsets[current_frame_int][0] * face_dir
+            offset_y = self.skill2_hand_offsets[current_frame_int][1]
+            if self.effect:
+                self.effect.x = self.p.x + offset_x
+                self.effect.y = self.p.y + offset_y
+                # 프레임 변화에 따른 스케일 보정(효과 미세조정)
+                # (이미 set_target_scale로 제어되므로 별도 처리 불필요)
+
+
 
     def draw(self):
-        char_frame_index = int(self.frame)
-        sx = char_frame_index * 82
-        if self.p.face_dir == 1:
-            self.p.image.clip_draw(sx, 0, 82, 135, self.p.x, self.p.y + (135 / 2))
-        else:
-            self.p.image.clip_composite_draw(sx, 0, 82, 135, 0, 'h', self.p.x, self.p.y + (135 / 2), 82, 135)
 
-        # 모든 이펙트 그리기
-        for effect in self.effects:
-            # 이펙트 프레임을 캐릭터 프레임에 동기화. 스킬 캐릭터 애니메이션의 특정 프레임에서 이펙트가 보이도록 설정
-            # PowerAttack을 참고하여 1~4 프레임에서 이펙트가 보이도록 가정 (총 5프레임 이펙트)
-            if 1 <= char_frame_index <= 4:
-                effect_display_index = char_frame_index - 1
-                effect.frame = effect_display_index
-                effect.draw(self.p.face_dir)
+        if self.state == SKILL_STATE_1:
+
+            frame_w, frame_h = 120, 75
+
+        else: # SKILL_STATE_2
+
+            frame_w, frame_h = 121, 65
+
+
+
+        sx = int(self.frame) * frame_w
+
+        if self.p.face_dir == 1:
+
+            self.p.image.clip_draw(sx, 0, frame_w, frame_h, self.p.x, self.p.y + frame_h / 2)
+
+        else:
+
+            self.p.image.clip_composite_draw(sx, 0, frame_w, frame_h, 0, 'h', self.p.x, self.p.y + frame_h/2, frame_w, frame_h)
+
+
+class Ultimate:
+    def __init__(self, p):
+        self.p = p
+        self.frame = 0
+    def enter(self, e):
+        self.p.load_image('Naruto_Idle.png')
+        self.frame = 0
+    def exit(self, e): pass
+    def do(self):
+        self.frame += 1 * game_framework.frame_time
+        if self.frame >= 1:
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
+    def draw(self):
+        self.p.image.draw(self.p.x, self.p.y)
+
 
 class Jump:
     def __init__(self, p): self.p = p
     def enter(self, e):
-        self.p.load_image('Byakuya_Jump.png')
-        self.p.y_velocity = self.p.jump_speed  # 점프 시작 시 y 속도 설정
-        self.p.jump_start_y = self.p.y # 점프 시작 높이 기록
+        self.p.load_image('Naruto_Jump.png')
+        self.p.y_velocity = self.p.jump_speed
+        self.p.jump_start_y = self.p.y
 
     def exit(self, e):
         self.p.y_velocity = 0
-        self.p.y = self.p.jump_start_y # 지면으로 y 위치 고정
-        # Removed redundant state_machine.handle_state_event(('TIMEOUT', None)) as it's handled in do method
+        self.p.y = self.p.jump_start_y
 
     def do(self):
-        # 중력 적용
         self.p.y_velocity -= self.p.gravity * game_framework.frame_time
         self.p.y += self.p.y_velocity * game_framework.frame_time
-
-        # 착지 확인
         if self.p.y <= self.p.jump_start_y:
             self.p.y = self.p.jump_start_y
-            self.p.state_machine.handle_state_event(('TIMEOUT', None)) # 점프 종료
+            self.p.state_machine.handle_state_event(('TIMEOUT', None))
 
     def draw(self):
-        # Byakuya_Jump.png is a single image, not a sprite sheet.
-        # Assuming dimensions 66x100 based on previous context.
         if self.p.face_dir == 1:
-            self.p.image.clip_draw(0, 0, 61, 95, self.p.x, self.p.y + (95 / 2))
+            self.p.image.clip_draw(0, 0, 51, 72, self.p.x, self.p.y + (95 / 2))
         else:
-            self.p.image.clip_composite_draw(0, 0, 61, 95, 0, 'h', self.p.x, self.p.y + (95 / 2), 61, 95)
+            self.p.image.clip_composite_draw(0, 0, 51, 72, 0, 'h', self.p.x, self.p.y + (95 / 2), 51, 72)
 
 
 # === 메인 클래스 Naruto ===
@@ -354,25 +446,27 @@ class Naruto:
         self.image = None
         self.pressed = set()
         self.input_buffer = []
-        self.opponent = None # 상대 객체 초기화
+        self.opponent = None
+        self.effect = None
 
-        self.jump_speed = 700 # 점프 초기 속도
-        self.gravity = 1500 # 중력 가속도
-        self.y_velocity = 0 # y축 속도
-        self.jump_start_y = self.y # 점프 시작 높이 (지면 높이)
+        self.jump_speed = 700
+        self.gravity = 1500
+        self.y_velocity = 0
+        self.jump_start_y = self.y
+        self.body_height = 100
 
-        self.health = 100 # 체력
-        self.invincible = False # 무적 상태
-        self.hit_timer = 0.0 # 피격 후 무적 시간 카운터
+        self.health = 100
+        self.invincible = False
+        self.hit_timer = 0.0
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
         self.DASH = Dash(self)
         self.ATTACK = Attack(self)
         self.POWERATTACK = PowerAttack(self)
-        self.ULTIMATE = Ultimate(self) # ULTIMATE 상태 초기화 (정의 순서에 맞춰 이동)
-        self.SKILL = Skill(self) # SKILL 상태 초기화 (정의 순서에 맞춰 이동)
-        self.JUMP = Jump(self) # JUMP 상태 초기화 (정의 순서에 맞춰 이동)
+        self.ULTIMATE = Ultimate(self)
+        self.SKILL = Skill(self)
+        self.JUMP = Jump(self)
 
         self.state_machine = StateMachine(self.IDLE, {
             self.IDLE: {
@@ -383,7 +477,7 @@ class Naruto:
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
-                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
             },
             self.RUN: {
                 lambda e: e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key in [SDLK_a, SDLK_d, SDLK_LEFT, SDLK_RIGHT, SDLK_KP_4, SDLK_KP_6]: self.IDLE,
@@ -392,28 +486,24 @@ class Naruto:
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
-                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
             },
             self.DASH: {time_out: self.IDLE},
             self.ATTACK: {time_out: self.IDLE},
             self.POWERATTACK: {time_out: self.IDLE},
             self.JUMP: {time_out: self.IDLE},
             self.SKILL: {time_out: self.IDLE},
-            self.ULTIMATE: {time_out: self.IDLE}, # ULTIMATE 상태 정의 추가
+            self.ULTIMATE: {time_out: self.IDLE},
         })
 
     def load_image(self, name):
         self.image = load_resource(name)
 
     def update(self):
-        if self.state_machine.cur_state in [self.IDLE, self.RUN]:
-            pass
         self.state_machine.update()
-
-        # 무적 시간 처리
         if self.invincible:
             self.hit_timer += game_framework.frame_time
-            if self.hit_timer >= 0.5: # 0.5초 무적
+            if self.hit_timer >= 0.5:
                 self.invincible = False
                 self.hit_timer = 0.0
 
@@ -421,91 +511,69 @@ class Naruto:
         if not self.invincible:
             self.health -= damage
             self.invincible = True
-            self.hit_timer = 0.0 # Reset timer
+            self.hit_timer = 0.0
             print(f"Naruto hit! Health: {self.health}")
             if self.health <= 0:
                 print("Naruto is defeated!")
-                # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
         if event.type == SDL_KEYDOWN:
             self.pressed.add(event.key)
             key = event.key
             if self.player == 1:
-                if key == SDLK_w: # Skill 트리거 시작
+                if key == SDLK_w:
                     self.input_buffer.append('w')
                 elif key == SDLK_s:
                     self.input_buffer.append('2')
                 elif key == SDLK_j:
-                    # Skill: w -> j
                     if self.input_buffer and self.input_buffer[-1] == 'w':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('SKILL', None))
                         return
-                    # PowerAttack: s -> j (input_buffer: '2')
                     if self.input_buffer and self.input_buffer[-1] == '2':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('PowerAttack', None))
                         return
-                elif key == SDLK_i: # Ultimate 트리거
+                elif key == SDLK_i:
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
             else: # Player 2
-                if key == SDLK_UP: # Skill 트리거 시작 (input buffer)
+                if key == SDLK_UP:
                     self.input_buffer.append('8')
-                elif key == SDLK_DOWN: # PowerAttack 트리거 시작 (input buffer)
+                elif key == SDLK_DOWN:
                     self.input_buffer.append('2')
-                elif key == KEY_MAP['P2']['ATTACK']: # SDLK_1
-                    # Skill: UP -> ATTACK (input_buffer: '8')
+                elif key == KEY_MAP['P2']['ATTACK']:
                     if self.input_buffer and self.input_buffer[-1] == '8':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('SKILL', None))
                         return
-                    # PowerAttack: DOWN -> ATTACK (input_buffer: '2')
                     if self.input_buffer and self.input_buffer[-1] == '2':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('PowerAttack', None))
                         return
-                elif key == KEY_MAP['P2']['ULTIMATE']: # SDLK_5
+                elif key == KEY_MAP['P2']['ULTIMATE']:
                     self.input_buffer.clear()
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
-
             if len(self.input_buffer) > 4:
                 self.input_buffer = self.input_buffer[-4:]
-
             self.state_machine.handle_state_event(('INPUT', event))
-
         elif event.type == SDL_KEYUP:
             if event.key in self.pressed:
                 self.pressed.remove(event.key)
             self.state_machine.handle_state_event(('INPUT', event))
 
-    def draw(self):
-        self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
-
     def get_bb(self):
-        # 캐릭터의 일반적인 몸체 충돌 상자 (Idle 상태 기준)
-        # x는 중앙, y는 바닥에 위치하므로,
-        # left = self.x - width/2
-        # bottom = self.y
-        # right = self.x + width/2
-        # top = self.y + height
-        
         width = 66
         height = 100
-        
         return self.x - width / 2, self.y, self.x + width / 2, self.y + height
 
     def draw(self):
         self.state_machine.draw()
         draw_rectangle(*self.get_bb())
-        
-        # Draw attack bounding box for debugging
         attack_bb = self.get_attack_bb()
         if attack_bb:
-            if isinstance(attack_bb, list): # For skill, which can return multiple bounding boxes
+            if isinstance(attack_bb, list):
                 for bb in attack_bb:
                     draw_rectangle(*bb)
             else:
@@ -514,55 +582,32 @@ class Naruto:
     def get_attack_bb(self):
         state = self.state_machine.cur_state
         if state == self.ATTACK:
-            # Byakuya_Attack_Effect.png (135x100)
-            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
-            # Active frames: 1 to 5 (char_frame_index)
             if 1 <= int(state.frame) <= 5:
-                width, height = 100, 80
-                if self.face_dir == 1: # Facing right
-                    return self.x + 10, self.y, self.x + 70, self.y + 80
-                else: # Facing left
-                    return self.x - 70, self.y, self.x - 10, self.y + 80
-            
+                if self.face_dir == 1:
+                    return self.x + 10, self.y, self.x + 30, self.y + 80
+                else:
+                    return self.x - 40, self.y, self.x - 10, self.y + 80
         elif state == self.POWERATTACK:
-            # Byakuya_PowerAttack_Effect.png (165x100)
-            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
-            # Active frames: 1 to 4 (char_frame_index)
             if 1 <= int(state.frame) <= 4:
-                width, height = 100, 80
-                if self.face_dir == 1: # Facing right
-                    return self.x + 10, self.y, self.x + 70, self.y + 80
-                else: # Facing left
-                    return self.x - 70, self.y, self.x - 10, self.y + 80
-        
+                if self.face_dir == 1:
+                    return self.x , self.y, self.x + 40, self.y + 80
+                else:
+                    return self.x - 40, self.y, self.x + 30, self.y + 80
         elif state == self.ULTIMATE:
-            # Byakuya_Ultimate_Effect.png (243x180)
-            # Effect is at self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20
-            # Active frames: 1 to 12 (char_frame_index)
             if int(state.frame) == 1 or 12 <= int(state.frame) <= 14:
                 width, height = 243, 180
-                # Calculate effect's actual x position based on face_dir
                 effect_x = self.x + (self.face_dir * 50)
-                effect_y = self.p.y + (100 / 2) + 20
-                
+                effect_y = self.y + (100 / 2) + 20
                 return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
-
         elif state == self.SKILL:
-            # Skill has moving projectiles, need to get BB for each active projectile
             active_bbs = []
-            for effect in state.effects:
-                # Skill effect image: 88x8
-                # Draw at effect.x, effect.y
-                # Active frames: 1 to 4 (char_frame_index) for the main character animation,
-                # but the effect itself also has frames.
-                # Assuming the effect is active throughout its lifespan
-                if 1 <= int(state.frame) <= 4: # Only consider the skill's effect when Byakuya is actively animating the skill.
-                    effect_width, effect_height = 88, 8
-                    active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,
-                                       effect.x + effect_width / 2, effect.y + effect_height / 2))
-            return active_bbs if active_bbs else None # Return a list of BBs or None
+            if state.effect:
+                effect_x, effect_y = state.effect.x, state.effect.y
+                effect_w, effect_h = state.effect.frame_w, state.effect.frame_h
+                active_bbs.append((effect_x - effect_w / 2, effect_y - effect_h / 2,
+                                   effect_x + effect_w / 2, effect_y + effect_h / 2))
+            return active_bbs if active_bbs else None
+        return None
 
-        return None # No attack active
-
-    def set_opponent(self, opponent): # 상대 객체를 설정하는 메서드 추가
+    def set_opponent(self, opponent):
         self.opponent = opponent
