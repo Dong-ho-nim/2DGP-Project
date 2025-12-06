@@ -2,6 +2,7 @@ from pico2d import *
 import game_framework
 import sys
 import play_mode
+from Sound_Manager import sound_manager
 
 # Constants
 GRID_COLS = 2
@@ -92,6 +93,14 @@ def enter():
     p1_selected_char = None
     p2_selected_char = None
 
+    # Sound: stop lobby and play character selection loop
+    try:
+        sound_manager.load_all()
+        sound_manager.stop('Lobby')
+        sound_manager.play('Character_Selection', loop=True, volume=64)
+    except Exception:
+        pass
+
 def exit():
     global background, characters, font, p1_cursor_anim, p2_cursor_anim
     del background
@@ -100,6 +109,14 @@ def exit():
         del font
     del p1_cursor_anim
     del p2_cursor_anim
+    # Stop character selection sound
+    try:
+        sound_manager.stop('Character_Selection')
+    except Exception:
+        try:
+            sound_manager.stop_all()
+        except Exception:
+            pass
 
 def update():
     p1_cursor_anim.update()

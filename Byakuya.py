@@ -239,7 +239,7 @@ class Ultimate:
         
         # If the attack landed and we are in the last 4 frames, slow down
         if self.hit_landed and int(self.frame) >= 10:
-            animation_speed_factor = 0.1
+            animation_speed_factor = 0.6
 
         self.frame += 14 * game_framework.frame_time * animation_speed_factor
         if self.frame >= 13.9: # 프레임 수에 맞춰 조건 변경 (0-13)
@@ -518,9 +518,9 @@ class Byakuya:
             self.JUMP: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
             self.SKILL: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
             self.ULTIMATE: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
-            self.HIT: {time_out: self.IDLE},
-        })
-
+                                                self.HIT: {time_out: self.IDLE},
+                                            })
+                                    
     def load_image(self, name):
         self.image = load_resource(name)
 
@@ -545,7 +545,7 @@ class Byakuya:
     def handle_event(self, event):
         if self.state_machine.cur_state == self.HIT:
             return
-
+            
         if event.type == SDL_KEYDOWN:
             self.pressed.add(event.key)
             key = event.key
@@ -566,7 +566,7 @@ class Byakuya:
                 elif key == SDLK_i:
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
-            else:
+            else: # Player 2
                 if key == SDLK_UP:
                     self.input_buffer.append('8')
                 elif key == SDLK_DOWN:
@@ -584,62 +584,76 @@ class Byakuya:
                     self.input_buffer.clear()
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
-
             if len(self.input_buffer) > 4:
                 self.input_buffer = self.input_buffer[-4:]
-
             self.state_machine.handle_state_event(('INPUT', event))
-
         elif event.type == SDL_KEYUP:
             if event.key in self.pressed:
                 self.pressed.remove(event.key)
             self.state_machine.handle_state_event(('INPUT', event))
 
-    def draw(self):
-        self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
-        # Draw attack BB for debugging
-        attack_bb = self.get_attack_bb()
-        if attack_bb:
-            if isinstance(attack_bb, list):
-                for bb in attack_bb:
-                    draw_rectangle(*bb)
-            else:
-                draw_rectangle(*attack_bb)
-
     def get_bb(self):
         width = 66
         height = 100
         return self.x - width / 2, self.y, self.x + width / 2, self.y + height
+        
+    def draw(self):
+        self.state_machine.draw()
+        # debugging: draw bounding box (commented out to hide red BB)
+        # draw_rectangle(*self.get_bb())
+        attack_bb = self.get_attack_bb()
+        if attack_bb:
+            if isinstance(attack_bb, list):
+                for bb in attack_bb:
+                    # draw_rectangle(*bb)
+                    pass
+            else:
+                # draw_rectangle(*attack_bb)
+                pass
 
     def get_attack_bb(self):
         state = self.state_machine.cur_state
         if state == self.ATTACK:
-            if 1 <= int(state.frame) <= 5:
-                if self.face_dir == 1:
-                    return self.x + 10, self.y, self.x + 30, self.y + 80
-                else:
-                    return self.x - 40, self.y, self.x - 10, self.y + 80
+            try:
+                frame_idx = int(state.frame)
+            except Exception:
+                return None
+            if 1 <= frame_idx <= 5: # Attack frames where hitbox is active
+                if self.face_dir == 1: # Facing right
+                    return self.x + 10, self.y, self.x + 70, self.y + 80
+                else: # Facing left
+                    return self.x - 70, self.y, self.x - 10, self.y + 80
         elif state == self.POWERATTACK:
-            if 1 <= int(state.frame) <= 4:
-                if self.face_dir == 1:
-                    return self.x , self.y, self.x + 40, self.y + 80
-                else:
-                    return self.x - 40, self.y, self.x + 30, self.y + 80
+            try:
+                frame_idx = int(state.frame)
+            except Exception:
+                return None
+            if 1 <= frame_idx <= 4: # Power attack frames where hitbox is active
+                if self.face_dir == 1: # Facing right
+                    return self.x + 10, self.y, self.x + 70, self.y + 80
+                else: # Facing left
+                    return self.x - 70, self.y, self.x - 10, self.y + 80
         elif state == self.ULTIMATE:
-            if int(state.frame) == 1 or 12 <= int(state.frame) <= 14:
+            try:
+                frame_idx = int(state.frame)
+            except Exception:
+                return None
+            if int(state.frame) == 1 or (12 <= int(state.frame) <= 14): # Ultimate active frames
                 width, height = 243, 180
                 effect_x = self.x + (self.face_dir * 50)
                 effect_y = self.y + (100 / 2) + 20
                 return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
         elif state == self.SKILL:
             active_bbs = []
-            if state.effects:
-                for effect in state.effects:
-                    effect_x, effect_y = effect.x, effect.y
-                    effect_w, effect_h = effect.frame_w, effect.frame_h
-                    active_bbs.append((effect_x - effect_w / 2, effect_y - effect_h / 2,
-                                       effect_x + effect_w / 2, effect_y + effect_h / 2))
+            for effect in state.effects:
+                try:
+                    frame_idx = int(state.frame)
+                except Exception:
+                    continue
+                if 1 <= frame_idx <= 4: # Skill active frames
+                    effect_width, effect_height = 88, 8
+                    active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,
+                                       effect.x + effect_width / 2, effect.y + effect_height / 2))
             return active_bbs if active_bbs else None
         return None
 

@@ -8,6 +8,7 @@ from Byakuya import Byakuya
 from Naruto import Naruto
 from Sado import Sado
 from BackGround import BackGround
+from Sound_Manager import sound_manager
 
 p1_char_name = None
 p2_char_name = None
@@ -63,6 +64,14 @@ def enter():
 
     game_world.clear()
     game_world.add_object(BackGround(), 0)
+
+    # Sound: stop selection music and play Ready_Go for the match
+    try:
+        sound_manager.load_all()
+        sound_manager.stop('Character_Selection')
+        sound_manager.play('Ready_Go', loop=False, volume=64)
+    except Exception:
+        pass
 
     character_selection_background_image = load_image('Icon/images/Icon_Frame.png')
 
@@ -147,6 +156,10 @@ def update():
             state_timer = 0.0
             # 패배한 플레이어는 게임 월드에서 제거
             game_world.remove_object(loser_player)
+            try:
+                sound_manager.play('KO', loop=False, volume=64)
+            except Exception:
+                pass
             return
 
         # 충돌 감지
@@ -156,8 +169,16 @@ def update():
             if isinstance(p1_attack_bb, list):
                 for bb in p1_attack_bb:
                     if collide(bb, p2_body_bb) and not p2.invincible:
+                        try:
+                            sound_manager.play('Hit', loop=False, volume=64)
+                        except Exception:
+                            pass
                         p2.take_hit(10); break
             elif collide(p1_attack_bb, p2_body_bb) and not p2.invincible:
+                try:
+                    sound_manager.play('Hit', loop=False, volume=64)
+                except Exception:
+                    pass
                 p2.take_hit(10)
 
         p2_attack_bb = p2.get_attack_bb()
@@ -166,8 +187,16 @@ def update():
             if isinstance(p2_attack_bb, list):
                 for bb in p2_attack_bb:
                     if collide(bb, p1_body_bb) and not p1.invincible:
+                        try:
+                            sound_manager.play('Hit', loop=False, volume=64)
+                        except Exception:
+                            pass
                         p1.take_hit(10); break
             elif collide(p2_attack_bb, p1_body_bb) and not p1.invincible:
+                try:
+                    sound_manager.play('Hit', loop=False, volume=64)
+                except Exception:
+                    pass
                 p1.take_hit(10)
 
     elif play_state == 'KO':
@@ -178,6 +207,10 @@ def update():
             if winner_player:
                 # 승리 캐릭터의 상태를 IDLE로 강제 전환
                 winner_player.state_machine.change_state(winner_player.IDLE)
+            try:
+                sound_manager.play('Winner', loop=False, volume=64)
+            except Exception:
+                pass
     elif play_state == 'WINNER':
         if winner_player:
             # 승리 캐릭터의 IDLE 애니메이션을 업데이트
@@ -190,24 +223,11 @@ def update():
 def draw_character_zoom(player, scale=2.0):
     if not player or not player.image:
         return
-    
-    # 캐릭터 상태에서 그리기 정보를 가져옵니다.
-    # 각 캐릭터의 draw 메소드는 상태 머신을 통해 호출되므로, 현재 상태의 draw를 직접 호출하기는 어렵습니다.
-    # 대신, 현재 상태의 프레임과 이미지를 기반으로 다시 그립니다.
     state = player.state_machine.cur_state
     if not hasattr(state, 'frame') or not hasattr(state, 'p'):
         return
 
-    # 각 상태의 draw 메서드에서 프레임 계산 및 이미지 크기 정보를 가져와야 합니다.
-    # 이는 상태별로 다르므로, 여기서는 일반적인 접근을 시도합니다.
-    # 정확한 '줌'을 위해서는 모든 캐릭터의 모든 상태에 draw_zoomed 메서드를 추가하는 것이 좋습니다.
-    # 여기서는 마지막 프레임의 모습을 간단히 확대하여 보여주는 것으로 대체합니다.
-    
     try:
-        # 이 부분은 각 캐릭터의 상태 draw 메소드 구현에 따라 매우 달라질 수 있습니다.
-        # 일반화하기 어려운 부분으로, 우선 현재 x, y 위치에 크게 그리는 것으로 대체합니다.
-        # 정확한 프레임별 스프라이트 시트 위치(sx)를 알 수 없으므로, 간단하게 첫 프레임을 그립니다.
-        # 이상적으로는 player.state_machine.cur_state.draw_at(x,y,scale) 같은 함수가 필요합니다.
         dest_w, dest_h = player.image.w * scale, player.image.h * scale
         if hasattr(state, 'frame_w') and hasattr(state, 'frame_h'): # 프레임 정보가 있는 상태
              sx = int(state.frame) * state.frame_w
@@ -277,8 +297,6 @@ def draw():
         if o_image and state_timer >= 0.1:
             o_image.draw(get_canvas_width() // 2 + 50, get_canvas_height() // 2)
     elif play_state == 'WINNER':
-        # 승리 캐릭터의 IDLE 애니메이션은 game_world.render()를 통해 그려지고,
-        # 그 위에 'Winner' 이미지를 추가로 그립니다.
         if winner_image:
             winner_image.draw(get_canvas_width() // 2, get_canvas_height() // 2)
     

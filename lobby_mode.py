@@ -4,6 +4,7 @@ import math
 import game_framework
 import play_mode
 import character_select_mode
+from Sound_Manager import sound_manager
 
 # Sprite Animation Constants
 NUM_CIRCLE_FRAMES = 9
@@ -43,6 +44,13 @@ def enter():
     circle_frame = 0
     center1_scale = 0.0
 
+    # Load and play lobby background sound/music
+    try:
+        sound_manager.load_all()
+        sound_manager.play('Lobby', loop=True, volume=64)
+    except Exception:
+        pass
+
 
 def exit():
     global bg_image, bottom_right_image, top_left_image
@@ -58,6 +66,15 @@ def exit():
     del vs_human_image
     del vs_cpu_image
 
+    # Stop lobby sound when leaving
+    try:
+        sound_manager.stop('Lobby')
+    except Exception:
+        try:
+            sound_manager.stop_all()
+        except Exception:
+            pass
+
 
 def handle_events(event):
     if event.type == SDL_QUIT:
@@ -65,7 +82,7 @@ def handle_events(event):
     elif event.type == SDL_KEYDOWN:
         if event.key == SDLK_ESCAPE:
             game_framework.quit()
-        elif event.key == SDLK_j:
+        elif event.key == SDLK_j or event.key == SDLK_KP_1:
             game_framework.change_mode(character_select_mode)
 
 
@@ -83,28 +100,22 @@ def update():
 def draw():
     global circle_frame, center1_scale
     clear_canvas()
-    
-    # 1200x700 캔버스에 맞게 이미지 그리기
+
     bg_image.draw(600, 350, 1200, 700)
-    
-    # 오른쪽 아래, 왼쪽 위 (조정된 위치)
+
     bottom_right_image.draw(900, 200)
     top_left_image.draw(300, 500)
-    
-    # 중앙 확장 애니메이션 (581.png)
+
     width = center_image1.w * center1_scale
     height = center_image1.h * center1_scale
     center_image1.draw(600, 350, width, height)
 
-    # Circle.png는 프레임 애니메이션으로 적용
     sx = int(circle_frame) * circle_frame_width
     center_image2.clip_draw(sx, 0, circle_frame_width, 71, 600, 350) # Use 71 for height
 
-    # 버튼 (위치 유지)
     vs_human_image.draw(600, 400)
     vs_cpu_image.draw(600, 300)
 
-    # 중앙보다 조금 더 아래 (위치 유지)
     below_center_image.draw(600, 150)
     
     update_canvas()

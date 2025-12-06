@@ -769,12 +769,19 @@ class Pain:
 
     def draw(self):
         self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
+        # debugging: draw bounding box (commented out)
+        # draw_rectangle(*self.get_bb())  # 주석 처리: 디버그용 BB 표시 제거
 
         # Draw attack bounding box for debugging
         attack_bb = self.get_attack_bb()
         if attack_bb:
-            draw_rectangle(*attack_bb)
+            if isinstance(attack_bb, list):
+                for bb in attack_bb:
+                    # draw_rectangle(*bb)  # 주석 처리: 디버그용 attack BB 제거
+                    pass
+            else:
+                # draw_rectangle(*attack_bb)  # 주석 처리: 디버그용 attack BB 제거
+                pass
 
     def get_attack_bb(self):
         state = self.state_machine.cur_state

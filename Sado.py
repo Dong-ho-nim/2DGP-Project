@@ -398,14 +398,17 @@ class Sado:
         return self.x - width / 2, self.y, self.x + width / 2, self.y + height
     def draw(self):
         self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
+        # debugging: draw bounding box (commented out to hide red BB)
+        # draw_rectangle(*self.get_bb())
         attack_bb = self.get_attack_bb()
         if attack_bb:
             if isinstance(attack_bb, list):
                 for bb in attack_bb:
-                    draw_rectangle(*bb)
+                    # draw_rectangle(*bb)
+                    pass
             else:
-                draw_rectangle(*attack_bb)
+                # draw_rectangle(*attack_bb)
+                pass
     def get_attack_bb(self):
         state = self.state_machine.cur_state
         if state == self.ATTACK:
