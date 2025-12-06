@@ -104,6 +104,8 @@ class SkillEffect:
         else:
             self.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h', self.x, self.y, width, height)
 
+
+
 # === 상태 클래스들 ===
 class Idle:
     def __init__(self, p): self.p = p; self.frame = 0
@@ -201,32 +203,20 @@ SKILL_STATE_1 = 0
 SKILL_STATE_2 = 1
 
 class Skill:
-
     def __init__(self, p):
-
         self.p = p
-
         self.frame = 0
-
         self.state = SKILL_STATE_1
-
         self.effect = None
-
         self.state_timer = 0.0
-
         self.hit_on_first_frame = False
-
         self.scale_timer = 0.0
-
         self.scale_level = 0
-
+        self.is_paused_on_hit = False
+        self.timeout_sent = False
         # 프레임별 손의 상대 위치 (x, y) 오프셋
-
         self.skill1_hand_offsets = [(30, 30), (32, 35), (35, 30), (33, 28)]
-
         self.skill2_hand_offsets = [(40, 40), (42, 45), (45, 40), (43, 38), (40, 42), (42, 45), (45, 40)]
-
-
 
     def enter(self, e):
         self.frame = 0
@@ -239,17 +229,10 @@ class Skill:
         self.is_paused_on_hit = False
         self.timeout_sent = False
 
-
-
     def exit(self, e):
-
         if self.effect:
-
             game_world.remove_object(self.effect)
-
         self.effect = None
-
-
 
     def do(self):
         face_dir = self.p.face_dir
@@ -290,6 +273,21 @@ class Skill:
             if not self.is_paused_on_hit:
                 self.frame = (self.frame + 7 * game_framework.frame_time * 1.5)
 
+            current_frame_int = int(self.frame)
+            # Adjust effect scale based on frame
+            if self.effect:
+                if current_frame_int == 2:
+                    self.effect.set_target_scale(8.0)
+                elif current_frame_int == 3:
+                    self.effect.set_target_scale(16.0)
+                elif current_frame_int == 4:
+                    self.effect.set_target_scale(1.0)
+
+            if self.frame >= 6.9: # Animation end condition
+                if not self.timeout_sent:
+                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                    self.timeout_sent = True
+
             if self.frame < 1 and self.p.opponent:
                 attack_bb = self.p.get_attack_bb()
                 opponent_bb = None
@@ -298,7 +296,6 @@ class Skill:
 
                 if attack_bb and opponent_bb:
                     hit = False
-                    # get_attack_bb may return a list of bbs or a single bb
                     if isinstance(attack_bb, list):
                         for bb in attack_bb:
                             if collide(bb, opponent_bb):
@@ -307,81 +304,121 @@ class Skill:
                     else:
                         if collide(attack_bb, opponent_bb):
                             hit = True
-
                     if hit:
                         self.hit_on_first_frame = True
 
-            if self.hit_on_first_frame and self.frame >= 6:
-                self.is_paused_on_hit = True
+    def draw(self):
+        if self.state == SKILL_STATE_1:
+            frame_w, frame_h = 120, 75
+            sx = int(self.frame) * frame_w
+            if self.p.face_dir == 1:
+                self.p.image.clip_draw(sx, 0, frame_w, frame_h, self.p.x, self.p.y + (frame_h / 2))
+            else:
+                self.p.image.clip_composite_draw(sx, 0, frame_w, frame_h, 0, 'h', self.p.x, self.p.y + (frame_h / 2), frame_w, frame_h)
+        elif self.state == SKILL_STATE_2:
+            frame_w, frame_h = 121, 65
+            sx = int(self.frame) * frame_w
+            if self.p.face_dir == 1:
+                self.p.image.clip_draw(sx, 0, frame_w, frame_h, self.p.x, self.p.y + (frame_h / 2))
+            else:
+                self.p.image.clip_composite_draw(sx, 0, frame_w, frame_h, 0, 'h', self.p.x, self.p.y + (frame_h / 2), frame_w, frame_h)
 
-            if self.is_paused_on_hit:
-                self.frame = 6 # 프레임 고정
-                self.scale_timer += game_framework.frame_time
-                if self.scale_level == 0:
-                    if self.effect: self.effect.set_target_scale(8)
-                    self.scale_level = 1
-                elif self.scale_level == 1 and self.scale_timer > 0.08:
-                    if self.effect: self.effect.set_target_scale(16)
-                    self.scale_level = 2
-                elif self.scale_level == 2 and self.scale_timer > 0.18:
-                    if self.effect: self.effect.set_target_scale(16)
-                    self.scale_level = 3
-                elif self.scale_level == 3 and self.scale_timer > 0.35:
-                    if not self.timeout_sent:
-                        self.p.state_machine.handle_state_event(('TIMEOUT', None))
-                        self.timeout_sent = True
-            elif self.frame >= 7:
-                 if not self.timeout_sent:
-                        self.p.state_machine.handle_state_event(('TIMEOUT', None))
-                        self.timeout_sent = True
+class UltimateEffect:
+    def __init__(self, p):
+        self.p = p
+        self.image = load_resource('Naruto_Ultimate_Effect.png')
+        
+        self.y = 0
+        self.start_x = 0
+        self.current_width = 0
+        self.effect_height = 30 # From user's previous request
+        
+        # Calculate maximum width based on player's position and direction
+        left, _, right, _ = self.p.get_bb()
+        if self.p.face_dir == 1:
+            self.start_x = right
+            self.max_width = 1200 - self.start_x
+        else:
+            self.start_x = left
+            self.max_width = self.start_x - 0
 
-            current_frame_int = int(self.frame) % 7
-            offset_x = self.skill2_hand_offsets[current_frame_int][0] * face_dir
-            offset_y = self.skill2_hand_offsets[current_frame_int][1]
-            if self.effect:
-                self.effect.x = self.p.x + offset_x
-                self.effect.y = self.p.y + offset_y
+        self.extend_speed = 3000 # pixels per second, this is the "speed" the user can adjust
 
-
+    def update(self):
+        # Extend the beam
+        if self.current_width < self.max_width:
+            self.current_width += self.extend_speed * game_framework.frame_time
+            self.current_width = min(self.current_width, self.max_width)
+        
+        # Update y-position to follow player
+        _, _, _, top = self.p.get_bb()
+        self.y = top - 50 # Lowered position from user's request
 
     def draw(self):
+        if self.current_width > 0:
+            if self.p.face_dir == 1:
+                center_x = self.start_x + self.current_width / 2
+                self.image.draw(center_x, self.y, self.current_width, self.effect_height)
+            else:
+                center_x = self.start_x - self.current_width / 2
+                self.image.draw(center_x, self.y, self.current_width, self.effect_height)
 
-        if self.state == SKILL_STATE_1:
-
-            frame_w, frame_h = 120, 75
-
-        else: # SKILL_STATE_2
-
-            frame_w, frame_h = 121, 65
-
-
-
-        sx = int(self.frame) * frame_w
-
-        if self.p.face_dir == 1:
-
-            self.p.image.clip_draw(sx, 0, frame_w, frame_h, self.p.x, self.p.y + frame_h / 2)
-
-        else:
-
-            self.p.image.clip_composite_draw(sx, 0, frame_w, frame_h, 0, 'h', self.p.x, self.p.y + frame_h/2, frame_w, frame_h)
-
+    def get_bb(self):
+        if self.current_width > 0:
+            if self.p.face_dir == 1:
+                return self.start_x, self.y - self.effect_height / 2, self.start_x + self.current_width, self.y + self.effect_height / 2
+            else:
+                return self.start_x - self.current_width, self.y - self.effect_height / 2, self.start_x, self.y + self.effect_height / 2
+        return None
 
 class Ultimate:
     def __init__(self, p):
         self.p = p
-        self.frame = 0
-    def enter(self, e):
-        self.p.load_image('Naruto_Idle.png')
-        self.frame = 0
-    def exit(self, e): pass
-    def do(self):
-        self.frame += 1 * game_framework.frame_time
-        if self.frame >= 1:
-            self.p.state_machine.handle_state_event(('TIMEOUT', None))
-    def draw(self):
-        self.p.image.draw(self.p.x, self.p.y)
+        self.frame = 0.0
+        self.frame_count = 7
+        self.frame_w = 880 // 7
+        self.frame_h = 95
+        self.timeout_sent = False
+        self.effect_created = False
 
+    def enter(self, e):
+        self.p.load_image('Naruto_Ultimate.png')
+        self.frame = 0.0
+        self.timeout_sent = False
+        self.effect_created = False
+        self.p.effect = None
+
+    def exit(self, e):
+        if self.p.effect:
+            try:
+                game_world.remove_object(self.p.effect)
+            except ValueError:
+                pass
+            self.p.effect = None
+
+    def do(self):
+        self.frame += self.frame_count * game_framework.frame_time * 1.2
+        
+        # On the 6th frame, create the extending beam
+        if not self.effect_created and int(self.frame) == 5:
+            effect = UltimateEffect(self.p)
+            game_world.add_object(effect, 1)
+            self.p.effect = effect
+            self.effect_created = True
+
+        if self.frame >= self.frame_count:
+            if not self.timeout_sent:
+                self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                self.timeout_sent = True
+
+    def draw(self):
+        # Only draw Naruto. The effect will draw itself.
+        sx = int(self.frame) * self.frame_w
+        if self.p.face_dir == 1:
+            self.p.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.p.x, self.p.y + (self.frame_h / 2))
+        else:
+            self.p.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h',
+                                             self.p.x, self.p.y + (self.frame_h / 2), self.frame_w, self.frame_h)
 
 class Jump:
     def __init__(self, p): self.p = p
@@ -512,6 +549,7 @@ class Naruto:
         self.image = load_resource(name)
 
     def update(self):
+        # 상태 머신 업데이트 및 무적 타이머 처리
         self.state_machine.update()
         if self.invincible:
             self.hit_timer += game_framework.frame_time
@@ -530,6 +568,7 @@ class Naruto:
                 print("Naruto is defeated!")
 
     def handle_event(self, event):
+        # 상태가 HIT일 때 입력 무시
         if self.state_machine.cur_state == self.HIT:
             return
 
@@ -598,23 +637,29 @@ class Naruto:
     def get_attack_bb(self):
         state = self.state_machine.cur_state
         if state == self.ATTACK:
-            if 1 <= int(state.frame) <= 5:
+            try:
+                frame_idx = int(state.frame)
+            except Exception:
+                return None
+            if 1 <= frame_idx <= 5:
                 if self.face_dir == 1:
                     return self.x + 10, self.y, self.x + 30, self.y + 80
                 else:
                     return self.x - 40, self.y, self.x - 10, self.y + 80
         elif state == self.POWERATTACK:
-            if 1 <= int(state.frame) <= 4:
+            try:
+                frame_idx = int(state.frame)
+            except Exception:
+                return None
+            if 1 <= frame_idx <= 4:
                 if self.face_dir == 1:
                     return self.x , self.y, self.x + 40, self.y + 80
                 else:
                     return self.x - 40, self.y, self.x + 30, self.y + 80
         elif state == self.ULTIMATE:
-            if int(state.frame) == 1 or 12 <= int(state.frame) <= 14:
-                width, height = 243, 180
-                effect_x = self.x + (self.face_dir * 50)
-                effect_y = self.y + (100 / 2) + 20
-                return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
+            if self.effect and hasattr(self.effect, 'get_bb'):
+                return self.effect.get_bb()
+            return None # No attack box if effect doesn't exist
         elif state == self.SKILL:
             active_bbs = []
             if state.effect:
