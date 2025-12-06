@@ -277,7 +277,81 @@ class Skill:
         self.frame = 0
         # 상대방 중심에서 x축으로 퍼져나가는 이펙트 생성
         if self.p.opponent:
-            # 왼쪽으로 퍼지는 이펙트 - 상대방 y 좌표 보정 적용 (평균 높이 100 가정)
+            # 왼쪽으로 퍼지는 이펙트 - 상대방 y 좌표 보정 적용 (평균 높이 100 가정)# python
+            class Effect:
+                def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0, is_icon_effect=False, scale=1.0):
+                    self.x, self.y = x, y
+                    if is_icon_effect:
+                        base_dir = os.path.dirname(__file__)
+                        self.image = load_image(os.path.join(base_dir, 'Icon/images', image_name))
+                    else:
+                        self.image = load_resource(image_name)
+                    self.frame = 0
+                    self.frame_count = frame_count
+                    self.frame_w = frame_w
+                    self.frame_h = frame_h
+                    self.scale = scale
+                    self.speed = 1.5
+                    self.direction = direction
+                    self.move_speed = move_speed
+
+                def update(self):
+                    # 프레임 진행 및 자동 제거
+                    self.frame = self.frame + self.frame_count * game_framework.frame_time * self.speed
+                    if self.frame >= self.frame_count:
+                        game_world.remove_object(self)
+                    # 이동 처리(필요하면 사용)
+                    if self.move_speed != 0:
+                        self.x += self.direction * self.move_speed * game_framework.frame_time
+
+                def draw(self, face_dir=1):
+                    sx = int(self.frame) * self.frame_w
+                    draw_w = int(self.frame_w * self.scale)
+                    draw_h = int(self.frame_h * self.scale)
+                    if face_dir == 1:
+                        self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y, draw_w, draw_h)
+                    else:
+                        self.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h', self.x, self.y, draw_w, draw_h)# python
+                        class Skill:
+                            def __init__(self, p):
+                                self.p = p
+                                self.frame = 0
+                                self.effects = []
+
+                            def enter(self, e):
+                                self.p.load_image('Byakuya_Skill.png')
+                                self.frame = 0
+                                if self.p.opponent:
+                                    # 스킬 이펙트 크기 키우려면 scale 값을 1.0 이상으로 설정
+                                    big_scale = 1.8  # 예: 1.8배
+                                    effect_left = Effect(self.p.opponent.x, self.p.opponent.y + (100 / 2), 'Byakuya_Skill_Effect.png', 5, 88, 8, direction=-1, move_speed=200, scale=big_scale)
+                                    self.effects.append(effect_left)
+                                    effect_right = Effect(self.p.opponent.x, self.p.opponent.y + (100 / 2), 'Byakuya_Skill_Effect.png', 5, 88, 8, direction=1, move_speed=200, scale=big_scale)
+                                    self.effects.append(effect_right)
+
+                            def exit(self, e):
+                                self.effects.clear()
+
+                            def do(self):
+                                self.frame += 10 * game_framework.frame_time * 1.2
+                                if self.frame >= 9.9:
+                                    self.p.state_machine.handle_state_event(('TIMEOUT', None))
+                                for effect in self.effects:
+                                    effect.update()
+
+                            def draw(self):
+                                char_frame_index = int(self.frame)
+                                sx = char_frame_index * 82
+                                if self.p.face_dir == 1:
+                                    self.p.image.clip_draw(sx, 0, 82, 135, self.p.x, self.p.y + (135 / 2))
+                                else:
+                                    self.p.image.clip_composite_draw(sx, 0, 82, 135, 0, 'h', self.p.x, self.p.y + (135 / 2), 82, 135)
+
+                                for effect in self.effects:
+                                    if 1 <= char_frame_index <= 4:
+                                        effect_display_index = char_frame_index - 1
+                                        effect.frame = effect_display_index
+                                        effect.draw(self.p.face_dir)
             effect_left = Effect(self.p.opponent.x, self.p.opponent.y + (100 / 2), 'Byakuya_Skill_Effect.png', 5, 88, 8, direction=-1, move_speed=200)
             self.effects.append(effect_left)
             # 오른쪽으로 퍼지는 이펙트 - 상대방 y 좌표 보정 적용 (평균 높이 100 가정)
