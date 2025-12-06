@@ -39,9 +39,15 @@ def collide(a, b):
 
 # === 이펙트 클래스 ===
 class Effect:
-    def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0):
+    def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0, is_icon_effect=False):
         self.x, self.y = x, y
-        self.image = load_resource(image_name)
+        if is_icon_effect:
+            # Load from Icon/images folder
+            base_dir = os.path.dirname(__file__)
+            self.image = load_image(os.path.join(base_dir, 'Icon/images', image_name))
+        else:
+            # Load from character-specific folder
+            self.image = load_resource(image_name)
         self.frame = 0
         self.frame_count = frame_count
         self.frame_w = frame_w
@@ -51,14 +57,11 @@ class Effect:
         self.move_speed = move_speed
 
     def update(self):
-        effect_speed_factor = 1.0
-        if int(self.frame) >= self.frame_count - 2:
-            effect_speed_factor = 0.5
-        self.frame = (self.frame + self.frame_count * game_framework.frame_time * self.speed * effect_speed_factor) % self.frame_count
-        if self.direction != 0:
-            self.x += self.direction * self.move_speed * game_framework.frame_time
+        self.frame = self.frame + self.frame_count * game_framework.frame_time * self.speed
+        if self.frame >= self.frame_count:
+            game_world.remove_object(self)
 
-    def draw(self, face_dir):
+    def draw(self, face_dir=1): # Default face_dir to 1 for effects that don't need flipping
         sx = int(self.frame) * self.frame_w
         if face_dir == 1:
             self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y)
@@ -405,6 +408,9 @@ class Jump:
             self.p.image.clip_composite_draw(0, 0, 51, 72, 0, 'h', self.p.x, self.p.y + (95 / 2), 51, 72)
 
 
+
+
+
 class Hit:
     def __init__(self, p):
         self.p = p
@@ -413,6 +419,13 @@ class Hit:
     def enter(self, e):
         self.p.load_image('Naruto_Hit.png')
         self.duration = 0.5
+        # Create the hit effect at this object's center
+        effect_x = self.p.x
+        effect_y = self.p.y + self.p.body_height / 2
+        
+        frame_width = 2192 // 16 # 137
+        hit_effect = Effect(effect_x, effect_y, 'Hit_Effect.png', 16, frame_width, 200, is_icon_effect=True)
+        game_world.add_object(hit_effect, 2) # Add to effect layer
 
     def exit(self, e):
         pass
@@ -423,7 +436,7 @@ class Hit:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
 
     def draw(self):
-        # Assuming Naruto_Hit.png is a single 80x65 image
+        # Draw the character's Hit.png
         width, height = 55, 70
         if self.p.face_dir == 1:
             self.p.image.clip_draw(0, 0, width, height, self.p.x, self.p.y + (100 / 2))

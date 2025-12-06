@@ -4,6 +4,7 @@ import game_framework
 import os
 from state_machine import StateMachine
 from key_input_table import KEY_MAP
+import game_world
 
 # 리소스 로드
 def load_resource(path):
@@ -38,28 +39,29 @@ def collide(a, b):
 
 # === 이펙트 클래스 ===
 class Effect:
-    def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0):
+    def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0, is_icon_effect=False):
         self.x, self.y = x, y
-        self.image = load_resource(image_name)
+        if is_icon_effect:
+            # Load from Icon/images folder
+            base_dir = os.path.dirname(__file__)
+            self.image = load_image(os.path.join(base_dir, 'Icon/images', image_name))
+        else:
+            # Load from character-specific folder
+            self.image = load_resource(image_name)
         self.frame = 0
         self.frame_count = frame_count
         self.frame_w = frame_w
         self.frame_h = frame_h
         self.speed = 1.5
-        self.direction = direction # 이펙트의 이동 방향 (x축)
-        self.move_speed = move_speed # 이펙트의 x축 이동 속도
+        self.direction = direction
+        self.move_speed = move_speed
 
     def update(self):
-        effect_speed_factor = 1.0 # Default speed for effect
-        # Check if we are in the last 2 frames
-        if int(self.frame) >= self.frame_count - 2:
-            effect_speed_factor = 0.5 # Slow down speed
+        self.frame = self.frame + self.frame_count * game_framework.frame_time * self.speed
+        if self.frame >= self.frame_count:
+            game_world.remove_object(self)
 
-        self.frame = (self.frame + self.frame_count * game_framework.frame_time * self.speed * effect_speed_factor) % self.frame_count
-        if self.direction != 0: # 방향이 설정되어 있을 경우에만 x축 이동
-            self.x += self.direction * self.move_speed * game_framework.frame_time
-
-    def draw(self, face_dir):
+    def draw(self, face_dir=1): # Default face_dir to 1 for effects that don't need flipping
         sx = int(self.frame) * self.frame_w
         if face_dir == 1:
             self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y)
@@ -348,13 +350,26 @@ class Hit:
     def __init__(self, p):
         self.p = p
         self.duration = 0.5
+        self.hit_effect = None
 
     def enter(self, e):
         self.p.load_image('Byakuya_Hit.png')
         self.duration = 0.5
+        # Create the hit effect at this object's center (not opponent)
+        effect_x = self.p.x
+        effect_y = self.p.y + self.p.body_height / 2
+        frame_width = 2192 // 16 # 137
+        self.hit_effect = Effect(effect_x, effect_y, 'Hit_Effect.png', 16, frame_width, 200, is_icon_effect=True)
+        game_world.add_object(self.hit_effect, 2) # Add to effect layer
 
     def exit(self, e):
-        pass
+        # Remove effect from game_world if still present
+        if self.hit_effect:
+            try:
+                game_world.remove_object(self.hit_effect)
+            except Exception:
+                pass
+            self.hit_effect = None
 
     def do(self):
         self.duration -= game_framework.frame_time
@@ -379,26 +394,26 @@ class Byakuya:
         self.image = None
         self.pressed = set()
         self.input_buffer = []
-        self.opponent = None # 상대 객체 초기화
+        self.opponent = None
 
-        self.jump_speed = 700 # 점프 초기 속도
-        self.gravity = 1500 # 중력 가속도
-        self.y_velocity = 0 # y축 속도
-        self.jump_start_y = self.y # 점프 시작 높이 (지면 높이)
-        self.body_height = 100 # 캐릭터 높이 추가
+        self.jump_speed = 700
+        self.gravity = 1500
+        self.y_velocity = 0
+        self.jump_start_y = self.y
+        self.body_height = 100
 
-        self.health = 100 # 체력
-        self.invincible = False # 무적 상태
-        self.hit_timer = 0.0 # 피격 후 무적 시간 카운터
+        self.health = 100
+        self.invincible = False
+        self.hit_timer = 0.0
 
         self.IDLE = Idle(self)
         self.RUN = Run(self)
         self.DASH = Dash(self)
         self.ATTACK = Attack(self)
         self.POWERATTACK = PowerAttack(self)
-        self.ULTIMATE = Ultimate(self) # ULTIMATE 상태 초기화 (정의 순서에 맞춰 이동)
-        self.SKILL = Skill(self) # SKILL 상태 초기화 (정의 순서에 맞춰 이동)
-        self.JUMP = Jump(self) # JUMP 상태 초기화 (정의 순서에 맞춰 이동)
+        self.ULTIMATE = Ultimate(self)
+        self.SKILL = Skill(self)
+        self.JUMP = Jump(self)
         self.HIT = Hit(self)
 
         self.state_machine = StateMachine(self.IDLE, {
@@ -410,7 +425,7 @@ class Byakuya:
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
-                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
                 lambda e: e[0] == 'HIT': self.HIT,
             },
             self.RUN: {
@@ -420,7 +435,7 @@ class Byakuya:
                 lambda e: (self.player == 1 and p1_jump_down(e)) or (self.player == 2 and p2_jump_down(e)): self.JUMP,
                 lambda e: e[0] == 'PowerAttack': self.POWERATTACK,
                 lambda e: e[0] == 'SKILL': self.SKILL,
-                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE, # ULTIMATE 상태 전환 추가
+                lambda e: e[0] == 'ULTIMATE': self.ULTIMATE,
                 lambda e: e[0] == 'HIT': self.HIT,
             },
             self.DASH: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
@@ -428,7 +443,7 @@ class Byakuya:
             self.POWERATTACK: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
             self.JUMP: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
             self.SKILL: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
-            self.ULTIMATE: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT}, # ULTIMATE 상태 정의 추가
+            self.ULTIMATE: {time_out: self.IDLE, lambda e: e[0] == 'HIT': self.HIT},
             self.HIT: {time_out: self.IDLE},
         })
 
@@ -436,14 +451,10 @@ class Byakuya:
         self.image = load_resource(name)
 
     def update(self):
-        if self.state_machine.cur_state in [self.IDLE, self.RUN]:
-            pass
         self.state_machine.update()
-
-        # 무적 시간 처리
         if self.invincible:
             self.hit_timer += game_framework.frame_time
-            if self.hit_timer >= 0.5: # 0.5초 무적
+            if self.hit_timer >= 0.5:
                 self.invincible = False
                 self.hit_timer = 0.0
 
@@ -451,12 +462,11 @@ class Byakuya:
         if not self.invincible:
             self.health -= damage
             self.invincible = True
-            self.hit_timer = 0.0 # Reset timer
+            self.hit_timer = 0.0
             self.state_machine.handle_state_event(('HIT', None))
             print(f"Byakuya hit! Health: {self.health}")
             if self.health <= 0:
                 print("Byakuya is defeated!")
-                # 추가적인 사망 처리 로직 (애니메이션, 게임 오버 등)이 여기에 올 수 있습니다.
 
     def handle_event(self, event):
         if self.state_machine.cur_state == self.HIT:
@@ -466,41 +476,37 @@ class Byakuya:
             self.pressed.add(event.key)
             key = event.key
             if self.player == 1:
-                if key == SDLK_w: # Skill 트리거 시작
+                if key == SDLK_w:
                     self.input_buffer.append('w')
                 elif key == SDLK_s:
                     self.input_buffer.append('2')
                 elif key == SDLK_j:
-                    # Skill: w -> j
                     if self.input_buffer and self.input_buffer[-1] == 'w':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('SKILL', None))
                         return
-                    # PowerAttack: s -> j (input_buffer: '2')
                     if self.input_buffer and self.input_buffer[-1] == '2':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('PowerAttack', None))
                         return
-                elif key == SDLK_i: # Ultimate 트리거
+                elif key == SDLK_i:
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
-            else: # Player 2
-                if key == SDLK_UP: # Skill 트리거 시작
+            else:
+                if key == SDLK_UP:
                     self.input_buffer.append('8')
-                elif key in [SDLK_DOWN, SDLK_KP_5]:
+                elif key == SDLK_DOWN:
                     self.input_buffer.append('2')
-                elif key == KEY_MAP['P2']['ATTACK']: # SDLK_1
-                    # Skill: UP -> ATTACK (input_buffer: '8')
+                elif key == KEY_MAP['P2']['ATTACK']:
                     if self.input_buffer and self.input_buffer[-1] == '8':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('SKILL', None))
                         return
-                    # PowerAttack: DOWN -> ATTACK (input_buffer: '2')
                     if self.input_buffer and self.input_buffer[-1] == '2':
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('PowerAttack', None))
                         return
-                elif key == KEY_MAP['P2']['ULTIMATE']: # SDLK_5
+                elif key == KEY_MAP['P2']['ULTIMATE']:
                     self.input_buffer.clear()
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
@@ -518,76 +524,50 @@ class Byakuya:
     def draw(self):
         self.state_machine.draw()
         draw_rectangle(*self.get_bb())
-
-    def get_bb(self):
-
-        width = 66
-        height = 100
-        
-        return self.x - width / 2, self.y, self.x + width / 2, self.y + height
-
-    def draw(self):
-        self.state_machine.draw()
-        draw_rectangle(*self.get_bb())
-        
-        # Draw attack bounding box for debugging
+        # Draw attack BB for debugging
         attack_bb = self.get_attack_bb()
         if attack_bb:
-            if isinstance(attack_bb, list): # For skill, which can return multiple bounding boxes
+            if isinstance(attack_bb, list):
                 for bb in attack_bb:
                     draw_rectangle(*bb)
             else:
                 draw_rectangle(*attack_bb)
 
+    def get_bb(self):
+        width = 66
+        height = 100
+        return self.x - width / 2, self.y, self.x + width / 2, self.y + height
+
     def get_attack_bb(self):
         state = self.state_machine.cur_state
         if state == self.ATTACK:
-            # Byakuya_Attack_Effect.png (135x100)
-            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
-            # Active frames: 1 to 5 (char_frame_index)
             if 1 <= int(state.frame) <= 5:
-                width, height = 100, 80
-                if self.face_dir == 1: # Facing right
-                    return self.x + 10, self.y, self.x + 70, self.y + 80
-                else: # Facing left
-                    return self.x - 70, self.y, self.x - 10, self.y + 80
-            
+                if self.face_dir == 1:
+                    return self.x + 10, self.y, self.x + 30, self.y + 80
+                else:
+                    return self.x - 40, self.y, self.x - 10, self.y + 80
         elif state == self.POWERATTACK:
-            # Byakuya_PowerAttack_Effect.png (165x100)
-            # Effect is drawn at self.p.x, self.p.y + (100 / 2)
-            # Active frames: 1 to 4 (char_frame_index)
             if 1 <= int(state.frame) <= 4:
-                width, height = 100, 80
-                if self.face_dir == 1: # Facing right
-                    return self.x + 10, self.y, self.x + 70, self.y + 80
-                else: # Facing left
-                    return self.x - 70, self.y, self.x - 10, self.y + 80
-        
+                if self.face_dir == 1:
+                    return self.x , self.y, self.x + 40, self.y + 80
+                else:
+                    return self.x - 40, self.y, self.x + 30, self.y + 80
         elif state == self.ULTIMATE:
-            # Byakuya_Ultimate_Effect.png (243x180)
-            # Effect is at self.p.x + (self.p.face_dir * -50), self.p.y + (100 / 2) + 20
-            # Active frames: 1 to 12 (char_frame_index)
             if int(state.frame) == 1 or 12 <= int(state.frame) <= 14:
                 width, height = 243, 180
-                # Calculate effect's actual x position based on face_dir
                 effect_x = self.x + (self.face_dir * 50)
                 effect_y = self.y + (100 / 2) + 20
-                
                 return effect_x - width / 2, effect_y - height / 2, effect_x + width / 2, effect_y + height / 2
-
         elif state == self.SKILL:
-            # Skill has moving projectiles, need to get BB for each active projectile
             active_bbs = []
-            for effect in state.effects:
-                if 1 <= int(state.frame) <= 4: # Only consider the skill's effect when Byakuya is actively animating the skill.
-                    effect_width, effect_height = 88, 8
-                    active_bbs.append((effect.x - effect_width / 2, effect.y - effect_height / 2,
-                                       effect.x + effect_width / 2, effect.y + effect_height / 2))
-            return active_bbs if active_bbs else None # Return a list of BBs or None
+            if state.effects:
+                for effect in state.effects:
+                    effect_x, effect_y = effect.x, effect.y
+                    effect_w, effect_h = effect.frame_w, effect.frame_h
+                    active_bbs.append((effect_x - effect_w / 2, effect_y - effect_h / 2,
+                                       effect_x + effect_w / 2, effect_y + effect_h / 2))
+            return active_bbs if active_bbs else None
+        return None
 
-        return None # No attack active
-
-    def set_opponent(self, opponent): # 상대 객체를 설정하는 메서드 추가
+    def set_opponent(self, opponent):
         self.opponent = opponent
-
-

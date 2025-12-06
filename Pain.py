@@ -445,33 +445,34 @@ class PainUltimateStone:
         except Exception:
             self.image.draw(self.x, self.y, self.size, self.size)
 
-# --- Skill effect class 추가: Naruto의 SkillEffect와 유사하게 Pain용 이펙트 생성/갱신/드로우 처리 ---
-# 해당 블록은 실수로 추가된 중복 구현입니다. 원래 Pain의 Skill 구현은 파일 상단에 이미 존재하므로
-# 아래의 중복된 SkillEffect 및 Skill 클래스는 제거했습니다.
-
-
+# --- Inserted Skill state for Pain ---
 class Skill:
     def __init__(self, p):
         self.p = p
         self.frame = 0
-        # 이동 관련
         self.move_timer = 0.0
         self.move_duration = 0.20
         self.move_speed = 300
         self.move_dir = 0
 
     def enter(self, e):
+        # load skill animation and initialize
         self.p.load_image('Pain_Skill.png')
         self.frame = 0
-        # 상대가 있으면 상대 좌표로 이동 (face_dir 반대 방향으로 약간 오프셋)
+        # If opponent exists, snap Pain near opponent according to opponent.face_dir
         if getattr(self.p, 'opponent', None) and getattr(self.p.opponent, 'face_dir', None) is not None:
             opp = self.p.opponent
             if opp.face_dir == 1:
                 target_x = opp.x - 10
             else:
                 target_x = opp.x + 10
+            # clamp to stage bounds
             self.p.x = max(100, min(1100, target_x))
+            # no extra movement after snapping
+            self.move_timer = 0.0
+            self.move_dir = 0
         else:
+            # fallback: small step backward
             self.move_dir = - self.p.face_dir
             self.move_timer = self.move_duration
 
@@ -486,16 +487,47 @@ class Skill:
             self.p.x = max(100, min(1100, self.p.x))
             self.move_timer -= game_framework.frame_time
 
-        self.frame += 10 * game_framework.frame_time * 1.5
+        # advance animation
+        self.frame += 10 * game_framework.frame_time * 1.2
         if self.frame >= 9.9:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
-
     def draw(self):
         sx = int(self.frame) * 100
         if self.p.face_dir == 1:
             self.p.image.clip_draw(sx, 0, 100, 85, self.p.x, self.p.y + (85 / 2))
         else:
             self.p.image.clip_composite_draw(sx, 0, 100, 85, 0, 'h', self.p.x, self.p.y + (85 / 2), 100, 85)
+
+# === 이펙트 클래스 ===
+class Effect:
+    def __init__(self, x, y, image_name, frame_count, frame_w, frame_h, direction=0, move_speed=0, is_icon_effect=False):
+        self.x, self.y = x, y
+        if is_icon_effect:
+            # Load from Icon/images folder
+            base_dir = os.path.dirname(__file__)
+            self.image = load_image(os.path.join(base_dir, 'Icon/images', image_name))
+        else:
+            # Load from character-specific folder
+            self.image = load_resource(image_name)
+        self.frame = 0
+        self.frame_count = frame_count
+        self.frame_w = frame_w
+        self.frame_h = frame_h
+        self.speed = 1.5
+        self.direction = direction
+        self.move_speed = move_speed
+
+    def update(self):
+        self.frame = self.frame + self.frame_count * game_framework.frame_time * self.speed
+        if self.frame >= self.frame_count:
+            game_world.remove_object(self)
+
+    def draw(self, face_dir=1): # Default face_dir to 1 for effects that don't need flipping
+        sx = int(self.frame) * self.frame_w
+        if face_dir == 1:
+            self.image.clip_draw(sx, 0, self.frame_w, self.frame_h, self.x, self.y)
+        else:
+            self.image.clip_composite_draw(sx, 0, self.frame_w, self.frame_h, 0, 'h', self.x, self.y, self.frame_w, self.frame_h)
 
 class Hit:
     def __init__(self, p):
@@ -505,6 +537,13 @@ class Hit:
     def enter(self, e):
         self.p.load_image('Pain_Hit.png')
         self.duration = 0.5
+        # Create the hit effect at this object's center
+        effect_x = self.p.x
+        effect_y = self.p.y + self.p.body_height / 2
+        
+        frame_width = 2192 // 16 # 137
+        hit_effect = Effect(effect_x, effect_y, 'Hit_Effect.png', 16, frame_width, 200, is_icon_effect=True)
+        game_world.add_object(hit_effect, 2) # Add to effect layer
 
     def exit(self, e):
         pass
@@ -515,7 +554,7 @@ class Hit:
             self.p.state_machine.handle_state_event(('TIMEOUT', None))
 
     def draw(self):
-        # Assuming Pain_Hit.png is a single 90x90 image
+        # Draw the character's Hit.png
         width, height = 45, 80
         if self.p.face_dir == 1:
             self.p.image.clip_draw(0, 0, width, height, self.p.x, self.p.y + (height / 2))
