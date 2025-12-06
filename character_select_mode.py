@@ -183,7 +183,7 @@ def handle_events(event):
                 p2_cursor_pos[0] = 0 # Keep in first row
             elif event.key == SDLK_DOWN or event.key == SDLK_UP: # Down/Up
                 p2_cursor_pos[0] = 0 # Always keep in first row
-            elif event.key == SDLK_KP_4 or event.key == SDLK_b: # P2 Select
+            elif event.key == event.key == SDLK_b or event.key == SDLK_KP_1: # P2 Select
                 char = characters[p2_cursor_pos[0]][p2_cursor_pos[1]]
                 if char:
                     p2_selected_char = char

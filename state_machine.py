@@ -52,3 +52,13 @@ class StateMachine:
             except Exception:
                 # 체크 함수 내부 에러 무시
                 continue
+
+    def change_state(self, new_state, event=None):
+        """ 강제로 상태를 변경하는 메서드 """
+        if self.cur_state and hasattr(self.cur_state, 'exit'):
+            self.cur_state.exit(event)
+        
+        self.cur_state = new_state
+        
+        if self.cur_state and hasattr(self.cur_state, 'enter'):
+            self.cur_state.enter(event)

@@ -145,6 +145,8 @@ def update():
             loser_player = p1 if p1.health <= 0 else p2
             play_state = 'KO'
             state_timer = 0.0
+            # 패배한 플레이어는 게임 월드에서 제거
+            game_world.remove_object(loser_player)
             return
 
         # 충돌 감지
@@ -173,7 +175,14 @@ def update():
         if state_timer >= 1.0:
             play_state = 'WINNER'
             state_timer = 0.0
+            if winner_player:
+                # 승리 캐릭터의 상태를 IDLE로 강제 전환
+                winner_player.state_machine.change_state(winner_player.IDLE)
     elif play_state == 'WINNER':
+        if winner_player:
+            # 승리 캐릭터의 IDLE 애니메이션을 업데이트
+            winner_player.update()
+
         state_timer += game_framework.frame_time
         if state_timer >= 2.0:
             game_framework.change_mode(lobby_mode)
@@ -268,8 +277,8 @@ def draw():
         if o_image and state_timer >= 0.1:
             o_image.draw(get_canvas_width() // 2 + 50, get_canvas_height() // 2)
     elif play_state == 'WINNER':
-        if winner_player:
-            draw_character_zoom(winner_player)
+        # 승리 캐릭터의 IDLE 애니메이션은 game_world.render()를 통해 그려지고,
+        # 그 위에 'Winner' 이미지를 추가로 그립니다.
         if winner_image:
             winner_image.draw(get_canvas_width() // 2, get_canvas_height() // 2)
     
