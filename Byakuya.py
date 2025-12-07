@@ -554,6 +554,16 @@ class Byakuya:
                     self.input_buffer.append('w')
                 elif key == SDLK_s:
                     self.input_buffer.append('2')
+                elif key == SDLK_d:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('3')
+                    else:
+                        self.input_buffer.append('6')
+                elif key == SDLK_a:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('1')
+                    else:
+                        self.input_buffer.append('4')
                 elif key == SDLK_j:
                     if self.input_buffer and self.input_buffer[-1] == 'w':
                         self.input_buffer.clear()
@@ -563,29 +573,53 @@ class Byakuya:
                         self.input_buffer.clear()
                         self.state_machine.handle_state_event(('PowerAttack', None))
                         return
+                    
+                    seq = ''.join(self.input_buffer[-3:])
+                    if seq in ['236', '263']:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('ULTIMATE', None))
+                        return
                 elif key == SDLK_i:
-                    self.state_machine.handle_state_event(('ULTIMATE', None))
-                    return
-            else: # Player 2
-                if key == SDLK_UP:
-                    self.input_buffer.append('8')
-                elif key == SDLK_DOWN:
-                    self.input_buffer.append('2')
-                elif key == KEY_MAP['P2']['ATTACK']:
-                    if self.input_buffer and self.input_buffer[-1] == '8':
-                        self.input_buffer.clear()
-                        self.state_machine.handle_state_event(('SKILL', None))
-                        return
-                    if self.input_buffer and self.input_buffer[-1] == '2':
-                        self.input_buffer.clear()
-                        self.state_machine.handle_state_event(('PowerAttack', None))
-                        return
-                elif key == KEY_MAP['P2']['ULTIMATE']:
                     self.input_buffer.clear()
                     self.state_machine.handle_state_event(('ULTIMATE', None))
                     return
-            if len(self.input_buffer) > 4:
-                self.input_buffer = self.input_buffer[-4:]
+            else: # Player 2
+                # P2: 공격/얼티밋 우선 처리 (키패드 포함)
+                if key in (KEY_MAP['P2']['ATTACK'], SDLK_KP_1):
+                    # Hold 기반 분기: 아래 보유 -> PowerAttack, 위 보유 -> SKILL
+                    if SDLK_DOWN in self.pressed or SDLK_KP_2 in self.pressed:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('PowerAttack', None))
+                        return
+                    if SDLK_UP in self.pressed or SDLK_KP_8 in self.pressed:
+                        self.input_buffer.clear()
+                        self.state_machine.handle_state_event(('SKILL', None))
+                        return
+                    # else: 약공격은 기존 INPUT 이벤트로 처리
+
+                # Ultimate: 메인 키 5 또는 키패드 5 모두 허용
+                elif key in (KEY_MAP['P2']['ULTIMATE'], SDLK_KP_5, SDLK_5):
+                    self.input_buffer.clear()
+                    self.state_machine.handle_state_event(('ULTIMATE', None))
+                    return
+
+                # P2 방향키/버퍼 기록 (방향키와 키패드 유사 키 지원)
+                if key in [SDLK_UP, SDLK_KP_8]:
+                    self.input_buffer.append('8')
+                elif key in [SDLK_DOWN, SDLK_KP_2]:
+                    self.input_buffer.append('2')
+                elif key in [SDLK_RIGHT, SDLK_KP_6]:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('3')
+                    else:
+                        self.input_buffer.append('6')
+                elif key in [SDLK_LEFT, SDLK_KP_4]:
+                    if self.input_buffer and self.input_buffer[-1] == '2':
+                        self.input_buffer.append('1')
+                    else:
+                        self.input_buffer.append('4')
+            if len(self.input_buffer) > 12:
+                self.input_buffer = self.input_buffer[-12:]
             self.state_machine.handle_state_event(('INPUT', event))
         elif event.type == SDL_KEYUP:
             if event.key in self.pressed:

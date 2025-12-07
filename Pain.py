@@ -99,11 +99,11 @@ class Jump:
     def __init__(self, p): self.p = p
     def enter(self, e):
         self.p.load_image('Pain_Jump.png')
-        self.p.y_velocity = self.p.jump_speed  # Use character's jump speed
+        self.p.y_velocity = self.p.jump_speed
         if self.p.dir != 0: self.p.face_dir = self.p.dir
     def exit(self, e):
-        self.p.y = self.p.jump_start_y # Snap to ground
-        self.p.y_velocity = 0 # Reset vertical velocity on exit
+        self.p.y = self.p.jump_start_y
+        self.p.y_velocity = 0
     def do(self):
         # 중력 적용
         self.p.y_velocity -= self.p.gravity * game_framework.frame_time
